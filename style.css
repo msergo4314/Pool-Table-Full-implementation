@@ -1,0 +1,74 @@
+body{
+    font-family: Verdana;
+    font-size: 1.5rem;
+    background-color: rgba(219, 216, 216, 0.556);
+}
+h1{
+    font-size: 2.4rem;
+    color: hsl(207, 54%, 62%);
+    font-family: 'OptimusPrincepsSemiBold', 'Times New Roman', 'MV Boli', Arial, Helvetica, sans-serif;
+}
+h2{
+    font-size: 1rem;
+    color: rgb(236, 77, 48);
+}
+form{
+    background-color: hsl(180, 2%, 88%);
+    text-align: center;
+    max-width: 500px;
+    margin: auto;
+    padding: 5px;
+    border-radius: 5px;
+    box-shadow: 5px 5px 10px hsl(0, 4%, 5%); /* horizontal offset, vertical offset, blur radius, colour */
+    padding-bottom: 40px;
+}
+
+.textBox{
+    width: 50%;
+    text-align: left;
+    font-size: 1.5rem;
+    border: 2px solid hsla(0, 0%, 0%, 0.8);
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+label{
+    /* font-family: 'edo-sz'; */
+    color: rgba(255, 39, 39, 0.822);
+    font-weight: bold;
+    font-size: 1.5rem;
+    font-family: 'edo sz','adobe garamond',Verdana, arial; /* haha funny yakuzer font */
+    margin-bottom: 10px;
+}
+button{
+    width: 60%;
+    background-color: hsl(0, 91%, 54%);
+    color: white;
+    margin-top: 15px;
+    padding: 10px, 15px;
+    font-size: 1.6rem;
+    cursor: pointer;
+    border-radius: 5px;
+}
+button:hover{
+    background-color: hsl(0, 91%, 45%);
+}
+.column {
+    float: left;
+    width: 50%;
+}
+
+.row:after {
+    content: "";
+    display: table;
+    clear: both;
+}
+.svgTableDisplay {
+    text-align: left;
+    /* max-height: 1200px; */
+}
+svg {
+    max-height: 100vh; /* Set maximum height to 100% of viewport height */
+    max-width: 100%; /* Set maximum width to 100% of its container's width */
+    height: auto; /* Allow the SVG to scale proportionally based on its width */
+    width: auto; /* Allow the SVG to scale proportionally based on its height */
+}
