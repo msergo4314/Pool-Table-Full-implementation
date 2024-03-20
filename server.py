@@ -34,9 +34,15 @@ def make_default_table() -> Physics.Table:
     return table_to_return
 
 def randomMillimeterOffset() -> float:
-    return 0.0
+    return 4.0
     import random
     return random.random() + 1
+
+def remove_svgs(path: str = f"{os.getcwd()}{'/tables/'}"):
+    list_of_files = os.listdir(path)
+    for file in list_of_files:
+        if file.endswith(".svg"):
+            os.remove(os.path.join(path, file))
 
 class ServerGame(Physics.Game):
     import random
@@ -61,7 +67,10 @@ class ServerGame(Physics.Game):
     def perform_shot(self, x_vel, y_vel) -> int:
         # returns the NUMBER OF TABLES generated from the shot
         self.num_shots_made += 1
-        super().shoot(gameName=self.game_Name, playerName=self.current_player, table=self.most_recent_table, xvel=x_vel, yvel=y_vel) # perform the shot
+        end_tables: tuple[Physics.Table] = super().shoot(gameName=self.game_Name, playerName=self.current_player, table=self.most_recent_table, xvel=x_vel, yvel=y_vel) # perform the shot
+        remove_svgs()
+        for i, table in enumerate(end_tables):
+            write_svg(i,table)
         self.switch_current_player()
         self.database.database_to_file()
         num_tables = super().get_number_of_tables_for_shot(self.num_shots_made)
@@ -153,15 +162,14 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.wfile.write(bytes(response_content, "utf-8"))
                 return
             # delete any SVGs currently existing
-            delete_SVGs_in_pwd()
-            current_table = ServerGame.most_recent_table
-            write_svg(0, current_table)
+            remove_svgs()
             game_name = form_data.get("game_name", 'NAME NOT FOUND').strip()
             player_one = form_data.get("player_one", 'NAME NOT FOUND').strip()
             player_two = form_data.get("player_two", 'NAME NOT FOUND').strip()
             # create game if it does not exist
             if MyHandler.current_game is None:
                 MyHandler.current_game = ServerGame(gameName=game_name, player_one=player_one, player_two=player_two) # initializze the game
+                current_table = MyHandler.current_game.most_recent_table
             response_content = f"""<!DOCTYPE html>
                             <html lang="en">
                             <head>
@@ -201,19 +209,24 @@ class MyHandler(BaseHTTPRequestHandler):
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length).decode('utf-8')
             form_data = json.loads(post_data) # parse the json object sent from the javascript file
-            # print("recieved shot request!")
-            # print(f"form data: {form_data}")
+            print("recieved shot request!")
+            print(f"form JSON data: {form_data}")
             xvel: float = form_data.get("velocity").get("x_vel")
             yvel: float = form_data.get("velocity").get("y_vel")
-            
+
             number_of_svgs_to_flash = MyHandler.current_game.perform_shot(xvel, yvel)
             print("did shot math:", str(number_of_svgs_to_flash))
             with open("display.html", "r") as file:
                 lines = file.readlines()
             for i in range(number_of_svgs_to_flash):
                 current_table = MyHandler.current_game.database.readTable(i)
+                if i == 0:
+                    print(current_table)
                 table_svg = current_table.svg()
                 write_svg(i+1, current_table)
+            from A3Test5 import generate_animation
+            remove_video()
+            generate_animation()
             player_one_text = f'<div class = "infoBox">Player one: {MyHandler.current_game.player1_name}</div>'
             player_two_text = f"<h2>Player two: {MyHandler.current_game.player2_name}</h2>"
             game_name_text = f"<h2>Game name: {MyHandler.current_game.game_Name}</h2>"
@@ -320,6 +333,11 @@ def reset_display_html() -> None:
 def box(string: str = None) -> str:
     return f'<div class="infoBox">{string}</div>'
 
+def remove_video(video_file_name: str = "svg_movie", extension: str = "webm" ):
+    if os.path.exists(f'{video_file_name}.{extension}'):
+        os.remove(f"{video_file_name}.{extension}")
+    return
+
 def main() -> None:
     # if len(sys.argv) < 2:
     #     print("Need a command line argument!")
@@ -327,7 +345,7 @@ def main() -> None:
     #     sys.exit(1)  # Exit the script
     temp = Physics.Database(reset=True) # reset the database in case it has data
     del temp
-
+    remove_video()
     # port_num = int(sys.argv[1]) + int(5e4)
     port_num = 3000
     # d is for daemon

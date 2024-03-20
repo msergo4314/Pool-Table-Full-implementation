@@ -15,7 +15,6 @@ const MAX_VEL = 4000.0; // max velocity of a shot
 // const MAX_SINGLE_VEL = Math.sqrt((MAX_VEL ** 2)/2);
 
 cueBall.addEventListener('mousedown', function (event) {
-    console.log("cueball mousedown")
     isDragging = true;
     const initialCueBallPosition = {
         x: cueBall.cx.baseVal.value,
@@ -46,7 +45,6 @@ cueBall.addEventListener('mousedown', function (event) {
             shotIndicator.setAttribute('stroke-dasharray', shotWidth * 2, shotWidth); // Set stroke-dasharray for dashed line
             
             cueBallMouseCoord = getMouseFromSVG(initialCueBallPosition, table);
-            console.log("adjusted pos:" + cueBallMouseCoord.x, cueBallMouseCoord.y)
 
             shotIndicator.setAttribute('x1', cueBallMouseCoord.x);
             shotIndicator.setAttribute('y1', cueBallMouseCoord.y);
@@ -55,7 +53,6 @@ cueBall.addEventListener('mousedown', function (event) {
 
             shotIndicator.setAttribute('x2', newMousePosition.x);
             shotIndicator.setAttribute('y2', newMousePosition.y);
-            console.log("made the line");
             // Create text element for velocity
             text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             text.setAttribute('x', newMousePosition.x - 40);
@@ -100,7 +97,7 @@ cueBall.addEventListener('mousedown', function (event) {
         document.removeEventListener('mouseup', onMouseUp);
         if (event.button === 0) { // Only proceed if it's a left click
             if (shotIndicator) {
-                acceleration = getAccelerationFromVelocity(x_vel, y_vel);
+                // acceleration = getAccelerationFromVelocity(x_vel, y_vel);
                 // const formattedXVel = Math.round(x_vel * 10) / 10;
                 // const formattedYVel = Math.round(y_vel * 10) / 10;
                 // const formattedXAcc = Math.round(acceleration.xacc * 10) / 10;
@@ -118,7 +115,6 @@ cueBall.addEventListener('mousedown', function (event) {
                     const shotData = {
                         initialPosition: initialCueBallPosition,
                         velocity: shotVel,
-                        acceleration: acceleration
                     };
                     sendShotData(shotData);
                 } else {
@@ -209,7 +205,6 @@ function getMouseFromSVG(SVGTableCoordinate) {
     // console.log(table.viewBox.baseVal);
     // console.log("WIDTH: ", (base.width + 2 * base.x));
     // console.log("X dISTANCE: ", SVGTableCoordinate.x/((base.width + 2 * base.x)) * (svgRect.right - svgRect.left));
-    
     const mouseX = svgRect.x + SVGTableCoordinate.x/((base.width + 2 * base.x)) * (svgRect.right - svgRect.left);
     const mouseY = svgRect.y + SVGTableCoordinate.y/((base.height + 2 * base.y)) * (svgRect.bottom - svgRect.top);
     // Return absolute mouse coordinates

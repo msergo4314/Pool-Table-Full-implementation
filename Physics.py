@@ -18,7 +18,7 @@ FOOTER = """</svg>\n"""
 ################################################################################
 # import constants from phylib to global varaibles (some new constants)
 
-FRAME_INTERVAL = 0.01 * 10# constant frame rate for database operations
+FRAME_INTERVAL = 0.01 * 1# constant frame rate for database operations
 BALL_RADIUS    = phylib.PHYLIB_BALL_RADIUS
 BALL_DIAMETER  = phylib.PHYLIB_BALL_DIAMETER
 HOLE_RADIUS    = phylib.PHYLIB_HOLE_RADIUS
@@ -433,17 +433,24 @@ class Database:
             VALUES (?, ?, ?, ?, ?)
         """, values)
 
-        Database.current_cursor.execute("""
-            INSERT INTO BallTable (BALLID, TABLEID)
-            SELECT Ball.BALLID, ? FROM Ball
-            WHERE NOT EXISTS (
-                SELECT 1 FROM BallTable WHERE BallTable.BALLID = Ball.BALLID
-            )
-        """, (table_ID,))
+        # SAFE BUT VERY SLOW VERSION
+        # Database.current_cursor.execute("""
+        #     INSERT INTO BallTable (BALLID, TABLEID)
+        #     SELECT Ball.BALLID, ? FROM Ball
+        #     WHERE NOT EXISTS (
+        #         SELECT 1 FROM BallTable WHERE BallTable.BALLID = Ball.BALLID
+        #     )
+        # """, (table_ID,))
+
+        # FAST AND DANEROUS VERSION
+        for item in table:
+            if isinstance(item, (RollingBall, StillBall)):
+                max : int = Database.current_cursor.execute("SELECT COALESCE(MAX(BALLID), 0) FROM BallTable").fetchone()[0] + 1
+                Database.current_cursor.execute("INSERT INTO BallTable (BALLID, TABLEID) Values (?, ?)", (max, table_ID))
 
         # Commit changes and close cursor
-        Database.current_database_connection.commit()
-        self.close_cursor()
+        # Database.current_database_connection.commit()
+        # self.close_cursor()
         return table_ID - 1 # adjust for offset of 1
 
     def add_shot(self, player_name, game_ID) -> Union[int, None]:
@@ -516,9 +523,9 @@ class Database:
 
     def set_game(self, game_name : str, player_1_name: str, player_2_name: str) -> int:
         # used in Game class
+        self.open_cursor()
         if (Database.current_cursor.execute("SELECT 1 FROM Game WHERE Game.GAMENAME = ?;", (game_name,)).fetchone()) is not None:
             return
-        self.open_cursor()
         game_ID = Database.current_cursor.execute("SELECT COALESCE(MAX(GAMEID), 0) FROM Game;").fetchone()[0] + 1
         Database.current_cursor.execute("""INSERT INTO Game (GAMENAME) SELECT ?
                                     WHERE NOT EXISTS (SELECT 1 FROM Game WHERE Game.GAMENAME = ?);""",\
@@ -530,8 +537,8 @@ class Database:
         Database.current_cursor.execute("""INSERT INTO Player (GAMEID, PLAYERNAME) SELECT ?, ? 
                                     WHERE NOT EXISTS(SELECT 1 FROM Player where Player.GAMEID = ? AND Player.PLAYERNAME = ?);""",\
                                         (game_ID, player_2_name, game_ID, player_2_name)) # add player two
-        self.current_database_connection.commit()
         self.close_cursor()
+        self.current_database_connection.commit()
         return game_ID
 
     def open_connection(self):
@@ -607,7 +614,7 @@ class Game:
             raise TypeError # raise an exception
         return
     
-    def shoot(self, gameName, playerName, table, xvel, yvel) -> tuple[int]:
+    def shoot(self, gameName, playerName, table, xvel, yvel) -> tuple[Table]:
         if not (all(isinstance(obj, (int, float)) for obj in (xvel, yvel)) and isinstance(table, Table) and table):
             return
         self.open_cursor()
@@ -626,29 +633,38 @@ class Game:
         # Game.current_cursor.execute("""INSERT INTO TableShot (TABLEID, SHOTID) SELECT ?, ? WHERE NOT EXISTS\
         #                             (SELECT 1 FROM TableShot AS ts WHERE ts.TABLEID = ? AND ts.SHOTID = ?);""", (table_ID, shot_ID, table_ID, shot_ID))
         from math import floor
-        list = []
+        list_of_tables : list[Table] = []
+        count = 0
         while table:
+            count += 1
             if (current_segment := table.segment()) is None:
                 break
             num_iterations = floor((current_segment.time - table.time) / FRAME_INTERVAL)
+            print(f"segment {count} has {num_iterations} svgs")
             for i in range(num_iterations):
                 roll_time : int = i * FRAME_INTERVAL
                 table_inner : Table = table.roll(roll_time)
                 table_inner.time = table.time + roll_time
                 table_ID = Game.database.writeTable(table_inner)  + 1 # add one since we will be inserting this ID into the db
-                self.open_cursor()
-                Game.current_cursor.execute("""INSERT INTO TableShot (TABLEID, SHOTID) SELECT ?, ? WHERE NOT EXISTS\
-                                            (SELECT 1 FROM TableShot AS ts WHERE ts.TABLEID = ? AND ts.SHOTID = ?);""", (table_ID, shot_ID, table_ID, shot_ID))
-                if i ==  num_iterations - 1:
-                    list.append(table_ID)
+                self.insert_into_tableShot(table_ID, shot_ID)
+                if i == num_iterations - 1:
+                    # append the last table of the segment
+                    list_of_tables.append(Game.database.readTable(i))
+                    self.open_cursor()
+                    print(f"END OF TABLE SEGMENT {count}")
             table = current_segment
-        Game.database.current_database_connection.commit()
+            if count >= 250:
+                print("TOO MANY SEGMENTS: ERROR")
+                return
+        print("FINISHED SHOOT")
         self.close_cursor()
-        return tuple(list)
+        Game.database.current_database_connection.commit()
+        return tuple(list_of_tables)
 
     def insert_into_tableShot(self, table_ID, shot_ID):
-        Game.current_cursor.execute("""INSERT INTO TableShot (TABLEID, SHOTID) SELECT ?, ? WHERE NOT EXISTS\
+        Game.database.current_cursor.execute("""INSERT INTO TableShot (TABLEID, SHOTID) SELECT ?, ? WHERE NOT EXISTS\
                                     (SELECT 1 FROM TableShot AS ts WHERE ts.TABLEID = ? AND ts.SHOTID = ?);""", (table_ID, shot_ID, table_ID, shot_ID))
+        return
 
     def set_cue_ball(self, cue_ball : Union[StillBall, RollingBall], xvel: float, yvel: float) -> Union[StillBall, RollingBall, None]:
         # should be okay to access as stillball even if rolling
