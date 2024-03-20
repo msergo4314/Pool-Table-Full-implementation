@@ -6,62 +6,64 @@ let x_vel, y_vel;
 let text; // Define text variable outside of event listeners
 let DocumentFragment;
 const table = document.getElementById("poolTable");
-
-const shotWidth  = '25'; // how big to make the shot line
-const INDICATOR_FONT_SIZE = '50px';
+const svgLayer = document.getElementById("svgLayer"); // hidden layer that goes above the pool table
+const shotWidth  = '10'; // how big to make the shot line
+const INDICATOR_FONT_SIZE = '16px';
 
 const DRAG = 150.0;
 const MAX_VEL = 4000.0; // max velocity of a shot
 // const MAX_SINGLE_VEL = Math.sqrt((MAX_VEL ** 2)/2);
 
 cueBall.addEventListener('mousedown', function (event) {
+    console.log("cueball mousedown")
     isDragging = true;
     const initialCueBallPosition = {
         x: cueBall.cx.baseVal.value,
         y: cueBall.cy.baseVal.value
     };
-
-    const initialMousePosition = getMousePositionSVG(event);
-
+    const initialMousePosition = getSVGFromMouse(event, svgLayer);
     // Update the mouse position as the mouse moves
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
 
     function onMouseMove(event) {
         if (isDragging) {
-            const newMousePosition = getMousePositionSVG(event);
+            const newMousePosition = getSVGFromMouse(event, svgLayer);
             // Calculate the movement of the mouse relative to the initial mouse position
             const dx = newMousePosition.x - initialMousePosition.x;
             const dy = newMousePosition.y - initialMousePosition.y;
             
-            // console.log("dx:", dx);
-            // console.log("dy:", dy);
             if (shotIndicator) {
                 shotIndicator.remove();
             }
             if (text) {
-                text.remove(); // Remove previous text element
+                text.remove();
             }
-            // Create a new shotIndicator line
             shotIndicator = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            // shotIndicator.setAttribute('stroke', 'rgb(182, 125, 60)');
             shotIndicator.setAttribute('stroke', 'white');
             shotIndicator.setAttribute('stroke-width', shotWidth);
             shotIndicator.setAttribute('stroke-dasharray', shotWidth * 2, shotWidth); // Set stroke-dasharray for dashed line
-            // Set the starting point of the line to the initial position of the cue ball
-            shotIndicator.setAttribute('x1', initialCueBallPosition.x);
-            shotIndicator.setAttribute('y1', initialCueBallPosition.y);
-            // Set the ending point of the line based on the scaled mouse movement
-            shotIndicator.setAttribute('x2', initialCueBallPosition.x + dx);
-            shotIndicator.setAttribute('y2', initialCueBallPosition.y + dy);
+            
+            cueBallMouseCoord = getMouseFromSVG(initialCueBallPosition, table);
+            console.log("adjusted pos:" + cueBallMouseCoord.x, cueBallMouseCoord.y)
 
+            shotIndicator.setAttribute('x1', cueBallMouseCoord.x);
+            shotIndicator.setAttribute('y1', cueBallMouseCoord.y);
+            // console.log(initialMousePosition.x, initialMousePosition.y);
+            // console.log("CUE BALL:" + initialCueBallPosition.x, initialCueBallPosition.y);
+
+            shotIndicator.setAttribute('x2', newMousePosition.x);
+            shotIndicator.setAttribute('y2', newMousePosition.y);
+            console.log("made the line");
             // Create text element for velocity
             text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            text.setAttribute('x', initialCueBallPosition.x + dx + 10);
-            text.setAttribute('y', initialCueBallPosition.y + dy - 10);
+            text.setAttribute('x', newMousePosition.x - 40);
+            text.setAttribute('y', newMousePosition.y - 20);
             text.setAttribute('fill', 'red');
             text.setAttribute('font-size', INDICATOR_FONT_SIZE);
-            x_vel = dx * 2.25;
-            y_vel = dy * 2.25;
+            x_vel = dx * 7;
+            y_vel = dy * 7;
             // console.log("x_vel:", x_vel);
             // console.log("y_vel:", y_vel);
             // Ensure that the velocities don't exceed 4000
@@ -87,8 +89,8 @@ cueBall.addEventListener('mousedown', function (event) {
             const formattedYVel = Math.round(y_vel * 10) / 10;
             // text.textContent = `Velocity: (${formattedXVel.toFixed(1)}, ${formattedYVel.toFixed(1)})`;
             text.textContent = `(${formattedXVel.toFixed(1)}, ${formattedYVel.toFixed(1)})`;
-            table.appendChild(text);
-            table.appendChild(shotIndicator);
+            svgLayer.appendChild(text);
+            svgLayer.appendChild(shotIndicator);
         }
     }
 
@@ -109,12 +111,13 @@ cueBall.addEventListener('mousedown', function (event) {
                 // `XACC: ${formattedXAcc.toFixed(1)}\nYACC: ${formattedYAcc.toFixed(1)}`);
                 confirmShot = true;
                 if (confirmShot) {
+                    shotVel = {
+                        x_vel,
+                        y_vel
+                    };
                     const shotData = {
                         initialPosition: initialCueBallPosition,
-                        velocity: {
-                            x_vel: x_vel,
-                            y_vel: y_vel
-                        },
+                        velocity: shotVel,
                         acceleration: acceleration
                     };
                     sendShotData(shotData);
@@ -128,6 +131,8 @@ cueBall.addEventListener('mousedown', function (event) {
             console.log('Shot canceled due to non-left click');
             if (shotIndicator) {
                 shotIndicator.remove();
+            }
+            if (text) {
                 text.remove();
             }
         }
@@ -143,13 +148,13 @@ table.addEventListener('contextmenu', function(event) {
     event.preventDefault(); // prevent right click on table
 });
 
-function getMousePositionSVG(event) {
+function getSVGFromMouse(event, SVGObject) {
     // converts mouse position to svg position via black magic
     const point = document.createElementNS('http://www.w3.org/2000/svg', 'svg').createSVGPoint();
     point.x = event.clientX;
     point.y = event.clientY;
-    const svg = document.getElementById('poolTable');
-    return point.matrixTransform(svg.getScreenCTM().inverse());
+    // const svg = document.getElementById('poolTable');
+    return point.matrixTransform(SVGObject.getScreenCTM().inverse());
 }
 
 function getAccelerationFromVelocity(xvel, yvel) {
@@ -190,4 +195,23 @@ function sendShotData(shotData) {
         // Handle errors
         console.error('There was a problem with the request:', error);
     });
+}
+
+function getMouseFromSVG(SVGTableCoordinate) {
+    const svgRect = table.getBoundingClientRect(); // Get bounding rectangle of SVG element
+    // Calculate absolute mouse coordinates
+
+    // console.log("INPUT XY: " + SVGTableCoordinate.x, SVGTableCoordinate.y);
+    // console.log("TABLE XY: " + svgRect.x, svgRect.y);
+
+    const base = table.viewBox.baseVal
+    // console.log(svgRect);
+    // console.log(table.viewBox.baseVal);
+    // console.log("WIDTH: ", (base.width + 2 * base.x));
+    // console.log("X dISTANCE: ", SVGTableCoordinate.x/((base.width + 2 * base.x)) * (svgRect.right - svgRect.left));
+    
+    const mouseX = svgRect.x + SVGTableCoordinate.x/((base.width + 2 * base.x)) * (svgRect.right - svgRect.left);
+    const mouseY = svgRect.y + SVGTableCoordinate.y/((base.height + 2 * base.y)) * (svgRect.bottom - svgRect.top);
+    // Return absolute mouse coordinates
+    return { x: mouseX, y: mouseY };
 }

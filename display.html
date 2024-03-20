@@ -9,7 +9,10 @@
 <body>
     <div class="row">
     <div class="column">
-<h2>Game name: gameName</h2><h2>Player one: Player_one_name</h2><h2>Player two: player 2</h2><h2>Current Player: Player_one_name<h2><br>    </div>
+    <div class="outerInfoBox">
+<h2>Game name: gameName</h2><div class = "infoBox">Player one: p1</div><h2>Player two: p2</h2><h2>Current Player: p2<h2><br>        <!--INSERT CURRENT TIME-->
+    </div> <!--for outer info box-->
+    </div> <!---for column 1-->
     <div class="column">
     <div class="svgTableDisplay">
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
@@ -43,10 +46,11 @@ xmlns:xlink="http://www.w3.org/1999/xlink">
  <circle id="15" cx="646" cy="477" r="28" fill="SANDYBROWN" />
  <circle id="13" cx="703" cy="477" r="28" fill="LIGHTSALMON" />
  <circle id="05" cx="760" cy="477" r="28" fill="ORANGE" />
- <circle cx="675" cy="2025" r="28" fill="WHITE" />
+ <circle cx="675" cy="2021" r="28" fill="WHITE" />
 </svg>
-    </div> <!--for column 2-->
+        <svg id="svgLayer"></svg>
     </div> <!--for svg-->
+    </div> <!--for column 2-->
     </div> <!--for row-->
     <script src="game.js"></script> <!--script should be at the end-->
 </body>

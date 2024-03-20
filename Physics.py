@@ -607,7 +607,7 @@ class Game:
             raise TypeError # raise an exception
         return
     
-    def shoot(self, gameName, playerName, table, xvel, yvel) -> None:
+    def shoot(self, gameName, playerName, table, xvel, yvel) -> tuple[int]:
         if not (all(isinstance(obj, (int, float)) for obj in (xvel, yvel)) and isinstance(table, Table) and table):
             return
         self.open_cursor()
@@ -626,10 +626,12 @@ class Game:
         # Game.current_cursor.execute("""INSERT INTO TableShot (TABLEID, SHOTID) SELECT ?, ? WHERE NOT EXISTS\
         #                             (SELECT 1 FROM TableShot AS ts WHERE ts.TABLEID = ? AND ts.SHOTID = ?);""", (table_ID, shot_ID, table_ID, shot_ID))
         from math import floor
+        list = []
         while table:
             if (current_segment := table.segment()) is None:
                 break
-            for i in range(floor((current_segment.time - table.time) / FRAME_INTERVAL)):
+            num_iterations = floor((current_segment.time - table.time) / FRAME_INTERVAL)
+            for i in range(num_iterations):
                 roll_time : int = i * FRAME_INTERVAL
                 table_inner : Table = table.roll(roll_time)
                 table_inner.time = table.time + roll_time
@@ -637,10 +639,12 @@ class Game:
                 self.open_cursor()
                 Game.current_cursor.execute("""INSERT INTO TableShot (TABLEID, SHOTID) SELECT ?, ? WHERE NOT EXISTS\
                                             (SELECT 1 FROM TableShot AS ts WHERE ts.TABLEID = ? AND ts.SHOTID = ?);""", (table_ID, shot_ID, table_ID, shot_ID))
+                if i ==  num_iterations - 1:
+                    list.append(table_ID)
             table = current_segment
         Game.database.current_database_connection.commit()
         self.close_cursor()
-        return
+        return tuple(list)
 
     def insert_into_tableShot(self, table_ID, shot_ID):
         Game.current_cursor.execute("""INSERT INTO TableShot (TABLEID, SHOTID) SELECT ?, ? WHERE NOT EXISTS\
