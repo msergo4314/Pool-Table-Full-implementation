@@ -1,20 +1,22 @@
 // start of script
-const cueBall = document.getElementById('00'); // the cueball has an ID (ball number) of 0
+let cueBall = document.getElementById('00'); // the cueball has an ID (ball number) of 0
 let isDragging = false;
 let shotIndicator; // Define shotIndicator variable outside of event listeners
 let x_vel, y_vel;
 let text; // Define text variable outside of event listeners
 let DocumentFragment;
-const table = document.getElementById("poolTable");
+let endTime;
+
+let table = document.getElementById("poolTable");
 const svgLayer = document.getElementById("svgLayer"); // hidden layer that goes above the pool table
 const shotWidth  = '10'; // how big to make the shot line
+const SIM_RATE = 0.01;
 const INDICATOR_FONT_SIZE = '16px';
-
 const DRAG = 150.0;
 const MAX_VEL = 4000.0; // max velocity of a shot
 // const MAX_SINGLE_VEL = Math.sqrt((MAX_VEL ** 2)/2);
 
-cueBall.addEventListener('mousedown', function (event) {
+function onMouseDown (event) {
     isDragging = true;
     const initialCueBallPosition = {
         x: cueBall.cx.baseVal.value,
@@ -133,7 +135,8 @@ cueBall.addEventListener('mousedown', function (event) {
             }
         }
     }
-});
+}
+cueBall.addEventListener('mousedown', onMouseDown)
 
 cueBall.addEventListener("mouseover", function(event) {
     this.style.cursor = "pointer";
@@ -167,31 +170,27 @@ function getAccelerationFromVelocity(xvel, yvel) {
 }
 
 function sendShotData(shotData) {
-    // Send a POST request to the server
-    console.log("sending shot data: " + x_vel + ' ' + y_vel);
-    fetch('/new_shot', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(shotData)
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
+    // post request for the shot
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/new_shot', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState === XMLHttpRequest.DONE) {
+            if (xhr.status == 200) {
+                console.log('Shot data sent successfully');
+                console.log(xhr.responseText);
+                var responseData = JSON.parse(xhr.responseText);
+                endTime = responseData.total_time;
+                getAllSVGs(endTime);
+                console.log("Time of last segment:", endTime);
+            } else {
+                console.error('Network response was not ok');
+            }
         }
-        // Handle successful response
-        return response.json();
-    })
-    .then(data => {
-        // Handle response data
-        console.log(data);
-    })
-    .catch(error => {
-        // Handle errors
-        console.error('There was a problem with the request:', error);
-    });
+    };
+    xhr.send(JSON.stringify(shotData));
 }
+
 
 function getMouseFromSVG(SVGTableCoordinate) {
     const svgRect = table.getBoundingClientRect(); // Get bounding rectangle of SVG element
@@ -209,4 +208,38 @@ function getMouseFromSVG(SVGTableCoordinate) {
     const mouseY = svgRect.y + SVGTableCoordinate.y/((base.height + 2 * base.y)) * (svgRect.bottom - svgRect.top);
     // Return absolute mouse coordinates
     return { x: mouseX, y: mouseY };
+}
+
+function getAllSVGs(endTime, callback) {
+    let time = 0.00;
+
+    function requestSVG(timeOfRequestedSVG) {
+        var xhr = new XMLHttpRequest();
+        var url = '/single_svg?time=' + encodeURIComponent(timeOfRequestedSVG)
+        xhr.open('GET', url, true);
+        xhr.setRequestHeader('Content-Type', 'image/svg+xml');
+        xhr.onreadystatechange = function () {
+            // if the response has been fully received
+            if (xhr.readyState == 4) {
+                if (xhr.status == 200) {
+                    tableDisplay = document.getElementById("svgTableDisplay");
+                    if (tableDisplay) {
+                        tableDisplay.innerHTML = xhr.responseText;
+                    }
+                    if (time <= endTime) {
+                        time += SIM_RATE;
+                        setTimeout(() => requestSVG(parseFloat(time.toFixed(2))), 100);
+                    } else if (callback) {
+                        callback();
+                    }
+                } else {
+                    console.error('Network failed to send SVGs');
+                }
+            }
+        };
+        xhr.send();
+        // console.log(`Requested all svgs for time: ${timeOfRequestedSVG}`);
+    }
+
+    requestSVG(time);
 }

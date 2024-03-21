@@ -405,18 +405,14 @@ class Database:
         self.close_cursor()
         return table_to_return
 
-    def writeTable(self, table):
+    def writeTable(self, table) -> int:
         if not isinstance(table, Table):
             return
-        self.open_cursor()
+        # self.open_cursor()
         # Get the next available TABLEID
-        Database.current_cursor.execute("SELECT COALESCE(MAX(TABLEID), 0) FROM TTable")
-        table_ID = Database.current_cursor.fetchone()[0] + 1
+        table_ID = Database.current_cursor.execute("SELECT COALESCE(MAX(TABLEID), 0) FROM TTable;").fetchone()[0] + 1
         
-        Database.current_cursor.execute("""
-            INSERT INTO TTable (TABLEID, TIME)
-            VALUES (?, ?)
-        """, (table_ID, table.time))
+        Database.current_cursor.execute("INSERT INTO TTable (TABLEID, TIME) VALUES (?, ?);", (table_ID, table.time))
 
         values = []  # Initialize an empty list for batch insertion
 
@@ -428,21 +424,8 @@ class Database:
                                 ball.vel.y if isinstance(item, RollingBall) else None))
 
         # Batch insert into Ball
-        Database.current_cursor.executemany("""
-            INSERT INTO Ball (BALLNO, XPOS, YPOS, XVEL, YVEL)
-            VALUES (?, ?, ?, ?, ?)
-        """, values)
+        Database.current_cursor.executemany("INSERT INTO Ball (BALLNO, XPOS, YPOS, XVEL, YVEL) VALUES (?, ?, ?, ?, ?) ", values)
 
-        # SAFE BUT VERY SLOW VERSION
-        # Database.current_cursor.execute("""
-        #     INSERT INTO BallTable (BALLID, TABLEID)
-        #     SELECT Ball.BALLID, ? FROM Ball
-        #     WHERE NOT EXISTS (
-        #         SELECT 1 FROM BallTable WHERE BallTable.BALLID = Ball.BALLID
-        #     )
-        # """, (table_ID,))
-
-        # FAST AND DANEROUS VERSION
         for item in table:
             if isinstance(item, (RollingBall, StillBall)):
                 max : int = Database.current_cursor.execute("SELECT COALESCE(MAX(BALLID), 0) FROM BallTable").fetchone()[0] + 1
@@ -635,8 +618,8 @@ class Game:
         from math import floor
         list_of_tables : list[Table] = []
         count = 0
+        self.open_cursor()
         while table:
-            count += 1
             if (current_segment := table.segment()) is None:
                 break
             num_iterations = floor((current_segment.time - table.time) / FRAME_INTERVAL)
@@ -644,18 +627,16 @@ class Game:
             for i in range(num_iterations):
                 roll_time : int = i * FRAME_INTERVAL
                 table_inner : Table = table.roll(roll_time)
-                table_inner.time = table.time + roll_time
+                table_inner.time = round(table.time + roll_time, 2)
+                # table_inner.time = table.time + roll_time
                 table_ID = Game.database.writeTable(table_inner)  + 1 # add one since we will be inserting this ID into the db
                 self.insert_into_tableShot(table_ID, shot_ID)
-                if i == num_iterations - 1:
+                # if i == 0:
                     # append the last table of the segment
-                    list_of_tables.append(Game.database.readTable(i))
-                    self.open_cursor()
-                    print(f"END OF TABLE SEGMENT {count}")
+                    # list_of_tables.append(Game.database.readTable(table_ID))
+                    # self.open_cursor()
             table = current_segment
-            if count >= 250:
-                print("TOO MANY SEGMENTS: ERROR")
-                return
+            # count += 1
         print("FINISHED SHOOT")
         self.close_cursor()
         Game.database.current_database_connection.commit()
@@ -712,4 +693,4 @@ def get_acceleration_coordinates(rolling_ball_dx: float, rolling_ball_dy: float)
         if (rolling_ball_speed > VEL_EPSILON):
             rolling_ball_a_x = -rolling_ball_dx * DRAG / rolling_ball_speed
             rolling_ball_a_y = -rolling_ball_dy * DRAG / rolling_ball_speed
-        return Coordinate(rolling_ball_a_x, rolling_ball_a_y)
+            return Coordinate(rolling_ball_a_x, rolling_ball_a_y)

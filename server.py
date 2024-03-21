@@ -1,12 +1,16 @@
-# A2 CIS*2750
+# A4 CIS*2750
 # Martin Sergo W24 
-import os, Physics, json # sys used to get argv, os for file operations, Physics for phylib library access, json for post request data
+import os, Physics, sys, json # sys used to get argv, os for file operations, Physics for phylib library access, json for post request data
+from typing import Union
+from subprocess import run, CalledProcessError, DEVNULL
 NUM_PADDED_ZEROES = 5
+extension = "webm"
+output_name = "svg_movie"
 # web server imports
 from http.server import HTTPServer, BaseHTTPRequestHandler
 # from icecream import ic # for debugging
 # used to parse the URL and extract form data for GET requests
-from urllib.parse import urlparse, parse_qsl
+from urllib.parse import urlparse, parse_qsl, parse_qs
 
 def make_default_table() -> Physics.Table:
 # Setup the table
@@ -38,25 +42,50 @@ def randomMillimeterOffset() -> float:
     import random
     return random.random() + 1
 
-def remove_svgs(path: str = f"{os.getcwd()}{'/tables/'}"):
+def remove_svgs(dir_name: str = "tables"):
+    path = f"{os.getcwd()}{f'/{dir_name}/'}"
     list_of_files = os.listdir(path)
     for file in list_of_files:
         if file.endswith(".svg"):
             os.remove(os.path.join(path, file))
 
+def generate_animation(directory : str = "/tables"):
+    supress_output = True
+    # print(os.path.exists(os.getcwd() + "/tables/"))
+    if os.path.exists(os.getcwd() + f"{directory}/") and os.listdir(os.getcwd() + f"{directory}/"):
+        command_for_animation_using_ffmpeg = f'ffmpeg -y -framerate 100 -i \
+                                .{directory}/table%0{NUM_PADDED_ZEROES}d.svg -vf "crop=687.5:1362.5:12.5:12.5"\
+                                -c:v libvpx-vp9 -pix_fmt yuv420p -s 540x1080 -b:v 2M -crf 8 -c:a libvorbis {output_name}.{extension}'
+        try:
+            print("attempting to generate video...")
+            if supress_output:
+                run(command_for_animation_using_ffmpeg, shell=True, check=True, stdout=DEVNULL, stderr=DEVNULL)
+            else:
+                run(command_for_animation_using_ffmpeg, shell=True, check=True)
+            print("Animation generated successfully.")
+        except CalledProcessError as e:
+            print("Error occurred while generating animation:", e)
+    return
+
+def write_svg(table_id, table, directory: str = "tables/"):
+    if not table:
+        return
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    with open(os.path.join(directory, f"table{table_id:0{NUM_PADDED_ZEROES}d}.svg"), "w") as fp:
+        fp.write(table.svg())
+
+
 class ServerGame(Physics.Game):
     import random
-    most_recent_table = make_default_table()
 
     def __init__(self, gameName: str=None, player_one: str = None, player_two: str = None):
         super().__init__(gameName=gameName, player1Name=player_one, player2Name=player_two) # call Game class constructor
         # print(self.game_ID, self.game_Name, self.player1_name, self.player2_name) # inherited from superclass
-        self.most_recent_table : Physics.Table = ServerGame.most_recent_table # initially the game will have the default table
-        self.current_player = self.player1_name if ServerGame.random.random() > 0.5 else self.player2_name
-        self.num_shots_made = 0
-        return
-    
-    def set_random_player(self):
+        self.most_recent_table : Physics.Table = make_default_table() # initially the game will have the default table
+        self.current_player : str = self.player1_name if ServerGame.random.random() > 0.5 else self.player2_name
+        self.num_shots_made : int = 0
+        self.set_High_low : bool = False
         return
     
     def switch_current_player(self):
@@ -67,20 +96,44 @@ class ServerGame(Physics.Game):
     def perform_shot(self, x_vel, y_vel) -> int:
         # returns the NUMBER OF TABLES generated from the shot
         self.num_shots_made += 1
-        end_tables: tuple[Physics.Table] = super().shoot(gameName=self.game_Name, playerName=self.current_player, table=self.most_recent_table, xvel=x_vel, yvel=y_vel) # perform the shot
-        remove_svgs()
-        for i, table in enumerate(end_tables):
-            write_svg(i,table)
-        self.switch_current_player()
+        end_tables: tuple[Physics.Table] = super().shoot(gameName=self.game_Name, playerName=self.current_player, table=self.most_recent_table, xvel=x_vel, yvel=y_vel)
+        # perform the shot
+        print(f"end_tables length: {len(end_tables)}")
+        # print("END TABLES:", *(str(i) for i in end_tables))
+        # for i, table in enumerate(end_tables):
+        #     # table = super().readTable()
+        #     write_svg(i,table)
         self.database.database_to_file()
-        num_tables = super().get_number_of_tables_for_shot(self.num_shots_made)
-        print(f"\n{num_tables} in all\n")
-        self.most_recent_table = self.database.readTable(num_tables-1)
+        num_tables = super().get_number_of_tables_for_shot(self.num_shots_made) # this will go from 1 - num_tables
+        # print(f"\n{num_tables} in all\n")
+        remove_svgs(dir_name='special2')
+        for i in range(num_tables):
+            write_svg(i, self.database.readTable(i), directory="special2/")
+        generate_animation(directory="/special2")
+        self.most_recent_table = self.database.readTable(num_tables - 1)
+        write_svg(0, self.most_recent_table, directory="special/")
+        self.switch_current_player()
         return num_tables
+
+    def read_time(self, time : float) -> Union[Physics.Table, None]:
+        x = self.database.current_cursor.execute("SELECT 1 FROM TTable WHERE TTable.TIME = ?;", (time,)).fetchone()
+        if x:
+            x = x[0] - 1
+        else:
+            print("FATAL MATCH ERROR")
+            sys.exit(1)
+        return self.database.readTable(x)
+    
+    def open_cursor(self):
+        return super().open_cursor()
 
 #################################################################################
 class MyHandler(BaseHTTPRequestHandler):
     current_game : ServerGame = None
+    
+    def log_message(self, format, *args):
+        return
+    
     def do_GET(self):
         # parse the URL to get the path and form data
         path = urlparse(self.path).path[1:]
@@ -134,6 +187,35 @@ class MyHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(content)
         
+        elif path in "single_svg":
+            parsed_path = urlparse(self.path)
+            query_params = parse_qs(parsed_path.query)
+            if "time" in query_params:
+                time = float(query_params["time"][0])  # Assuming only one time parameter
+                print("Time parameter:", time)
+                # Your code to handle the time parameter goes here
+                MyHandler.current_game.open_cursor()
+
+                if (response_content := MyHandler.current_game.read_time(time)):
+                    write_svg(int(100 * time), response_content)
+                    response_content : str = response_content.svg()
+                else:
+                    self.send_response(404)
+                    self.send_header("Content-type", "text")
+                    self.send_header("Content-length", len(response_content))
+                    self.end_headers()
+                    self.wfile.write(bytes(response_content, "utf-8"))
+                self.send_response(200)
+                self.send_header("Content-type", "image/svg+xml")
+                self.send_header("Content-length", len(response_content))
+                self.end_headers()
+                self.wfile.write(bytes(response_content, "utf-8"))
+            else:
+                self.send_response(404)
+                self.send_header("Content-type", "text")
+                self.send_header("Content-length", len(response_content))
+                self.end_headers()
+                self.wfile.write(bytes(response_content, "utf-8"))
         else:
             self.send_response(404)
             self.send_header("Content-type", "text/html")
@@ -162,7 +244,6 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.wfile.write(bytes(response_content, "utf-8"))
                 return
             # delete any SVGs currently existing
-            remove_svgs()
             game_name = form_data.get("game_name", 'NAME NOT FOUND').strip()
             player_one = form_data.get("player_one", 'NAME NOT FOUND').strip()
             player_two = form_data.get("player_two", 'NAME NOT FOUND').strip()
@@ -204,7 +285,7 @@ class MyHandler(BaseHTTPRequestHandler):
             self.send_header("Content-length", len(response_content))
             self.end_headers()
             self.wfile.write(bytes(response_content, "utf-8"))
-        
+    
         elif path == "new_shot":
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length).decode('utf-8')
@@ -213,55 +294,17 @@ class MyHandler(BaseHTTPRequestHandler):
             print(f"form JSON data: {form_data}")
             xvel: float = form_data.get("velocity").get("x_vel")
             yvel: float = form_data.get("velocity").get("y_vel")
-
+            if not MyHandler.current_game:
+                print("NO GAME")
+                return
             number_of_svgs_to_flash = MyHandler.current_game.perform_shot(xvel, yvel)
             print("did shot math:", str(number_of_svgs_to_flash))
-            with open("display.html", "r") as file:
-                lines = file.readlines()
-            for i in range(number_of_svgs_to_flash):
-                current_table = MyHandler.current_game.database.readTable(i)
-                if i == 0:
-                    print(current_table)
-                table_svg = current_table.svg()
-                write_svg(i+1, current_table)
-            from A3Test5 import generate_animation
-            remove_video()
-            generate_animation()
-            player_one_text = f'<div class = "infoBox">Player one: {MyHandler.current_game.player1_name}</div>'
-            player_two_text = f"<h2>Player two: {MyHandler.current_game.player2_name}</h2>"
-            game_name_text = f"<h2>Game name: {MyHandler.current_game.game_Name}</h2>"
-            current_player_text = f"<h2>Current Player: {MyHandler.current_game.current_player}<h2><br>"
-
-            # Iterate over the lines and modify as needed
-            modified_lines = []
-            for line in lines:
-                if "<!--INSERT TABLE HERE-->" in line:
-                    modified_lines.append(table_svg)
-                elif "<!--INSERT PLAYER ONE HERE-->" in line:
-                    modified_lines.append(player_one_text)
-                elif "<!--INSERT PLAYER TWO HERE-->" in line:
-                    modified_lines.append(player_two_text)
-                elif "<!--INSERT GAME NAME HERE-->" in line:
-                    modified_lines.append(game_name_text)
-                elif "<!--INSERT CURRENT PLAYER HERE-->" in line:
-                    modified_lines.append(current_player_text)
-                else:
-                    modified_lines.append(line)  # Keep the original line
-
-            # Write the modified lines back to the file
-            with open("display.html", "w") as file:
-                file.writelines(modified_lines)
-            # Write the updated content back to the file
-            # reset_display_html() # reset the file again
-            response_content = ''
-            for line in modified_lines:
-                response_content += line
+            response_content = f"{{\"total_time\": {round(MyHandler.current_game.most_recent_table.time, 2)}}}"
             self.send_response(200)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", "application/json")
             self.send_header("Content-length", len(response_content))
             self.end_headers()
             self.wfile.write(bytes(response_content, "utf-8"))
-            return
         
         else:
             self.send_response(404)
@@ -270,16 +313,8 @@ class MyHandler(BaseHTTPRequestHandler):
             self.send_header("content-type", "text/html")
             self.end_headers()
             self.wfile.write(bytes(response_content, "utf-8"))
+        
         return
-
-def write_svg(table_id, table):
-    if not table:
-        return
-    directory = "tables/"
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-    with open(os.path.join(directory, f"table{table_id:0{NUM_PADDED_ZEROES}d}.svg"), "w") as fp:
-        fp.write(table.svg())
 
 # no need to make this a class method
 def delete_SVGs_in_pwd() -> None:
@@ -343,6 +378,7 @@ def main() -> None:
     #     print("Need a command line argument!")
     #     # need to use exit instead of return
     #     sys.exit(1)  # Exit the script
+    from subprocess import DEVNULL
     temp = Physics.Database(reset=True) # reset the database in case it has data
     del temp
     remove_video()
@@ -351,7 +387,6 @@ def main() -> None:
     # d is for daemon
     httpd = HTTPServer(('localhost', port_num), MyHandler)
     # delete any SVG files currently existing
-    delete_SVGs_in_pwd()
     print("Server listing in port: ", port_num)
     try:
         httpd.serve_forever()
@@ -361,4 +396,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

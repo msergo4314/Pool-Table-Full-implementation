@@ -466,48 +466,6 @@ phylib_table *phylib_segment(phylib_table *table) {
     return NULL;
 }
 
-// phylib_table *phylib_segment(phylib_table *table) {
-//     if (table == NULL) {
-//         // printf("table is NULL\n");
-//         return NULL;
-//     }
-//     if (phylib_rolling(table) == 0) {
-//         // if no rollling balls return NULL
-//         return NULL;
-//     }
-//     double time = PHYLIB_SIM_RATE;
-//     phylib_table *new_table = phylib_copy_table(table);
-//     if (new_table != NULL) {
-//         while (time < PHYLIB_MAX_TIME) {
-//             for (int i = 0; i < PHYLIB_MAX_OBJECTS; i++) {
-//                 if (new_table->object[i] != NULL) {
-//                     if ((new_table->object)[i]->type == PHYLIB_ROLLING_BALL) {
-//                         phylib_roll(new_table->object[i], (table->object)[i], time);
-//                         // maybe move this line to after the bounce?
-//                         if (phylib_stopped((new_table->object)[i])) {
-//                             // a ball has stopped
-//                             goto function_exit;         
-//                         }
-//                         for(int j = 0; j < PHYLIB_MAX_OBJECTS; j++) {
-//                             if ((new_table->object)[j] != NULL && j != i) {
-//                                 if (phylib_distance((new_table->object)[i], (new_table->object)[j]) < 0.0) {
-//                                     phylib_bounce(&((new_table->object)[i]), &((new_table->object)[j]));
-//                                     goto function_exit;
-//                                 }
-//                             }
-//                         }
-//                     }
-//                 }
-//             }
-//             time += PHYLIB_SIM_RATE;
-//         }
-//     function_exit:
-//     new_table->time += time;
-//     return new_table;
-//     }
-//     return NULL;
-// }
-
 char *phylib_object_string(phylib_object *object) {
     static char string[80];
     if (object == NULL)
