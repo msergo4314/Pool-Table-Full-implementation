@@ -3,6 +3,7 @@
 import os, Physics, sys, json # sys used to get argv, os for file operations, Physics for phylib library access, json for post request data
 from typing import Union
 from subprocess import run, CalledProcessError, DEVNULL
+
 NUM_PADDED_ZEROES = 5
 extension = "webm"
 output_name = "svg_movie"
@@ -12,8 +13,20 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 # used to parse the URL and extract form data for GET requests
 from urllib.parse import urlparse, parse_qsl, parse_qs
 
+def remove_video(video_file_name: str = "svg_movie", extension: str = "webm" ):
+    if os.path.exists(f'{video_file_name}.{extension}'):
+        os.remove(f"{video_file_name}.{extension}")
+    return
+
 def make_default_table() -> Physics.Table:
-# Setup the table
+    
+    def randomMillimeterOffset() -> float:
+        return 4.0
+        import random
+        return random.random() + 1
+    
+    
+    # Setup the table
     table_to_return = Physics.Table()  # Create a new table
 
     # Define the number of rows and balls per row
@@ -36,11 +49,6 @@ def make_default_table() -> Physics.Table:
     sb = Physics.StillBall(0, pos)
     table_to_return += sb
     return table_to_return
-
-def randomMillimeterOffset() -> float:
-    return 4.0
-    import random
-    return random.random() + 1
 
 def remove_svgs(dir_name: str = "tables"):
     path = f"{os.getcwd()}{f'/{dir_name}/'}"
@@ -75,15 +83,14 @@ def write_svg(table_id, table, directory: str = "tables/"):
     with open(os.path.join(directory, f"table{table_id:0{NUM_PADDED_ZEROES}d}.svg"), "w") as fp:
         fp.write(table.svg())
 
-
 class ServerGame(Physics.Game):
-    import random
-
+    
     def __init__(self, gameName: str=None, player_one: str = None, player_two: str = None):
+        from random import random
         super().__init__(gameName=gameName, player1Name=player_one, player2Name=player_two) # call Game class constructor
         # print(self.game_ID, self.game_Name, self.player1_name, self.player2_name) # inherited from superclass
         self.most_recent_table : Physics.Table = make_default_table() # initially the game will have the default table
-        self.current_player : str = self.player1_name if ServerGame.random.random() > 0.5 else self.player2_name
+        self.current_player : str = self.player1_name if random() > 0.5 else self.player2_name
         self.num_shots_made : int = 0
         self.set_High_low : bool = False
         return
@@ -105,11 +112,10 @@ class ServerGame(Physics.Game):
         #     write_svg(i,table)
         self.database.database_to_file()
         num_tables = super().get_number_of_tables_for_shot(self.num_shots_made) # this will go from 1 - num_tables
-        # print(f"\n{num_tables} in all\n")
-        remove_svgs(dir_name='special2')
+        remove_svgs()
         for i in range(num_tables):
-            write_svg(i, self.database.readTable(i), directory="special2/")
-        generate_animation(directory="/special2")
+            write_svg(i, self.database.readTable(i))
+        generate_animation()
         self.most_recent_table = self.database.readTable(num_tables - 1)
         write_svg(0, self.most_recent_table, directory="special/")
         self.switch_current_player()
@@ -131,8 +137,8 @@ class ServerGame(Physics.Game):
 class MyHandler(BaseHTTPRequestHandler):
     current_game : ServerGame = None
     
-    def log_message(self, format, *args):
-        return
+    # def log_message(self, format, *args):
+    #     return
     
     def do_GET(self):
         # parse the URL to get the path and form data
@@ -149,26 +155,16 @@ class MyHandler(BaseHTTPRequestHandler):
             self.wfile.write(content)
             MyHandler.current_game = None
 
-        elif path.startswith("table-") and path.endswith(".svg"):    
+        elif path.startswith("table-") and path.endswith(".svg") and os.path.exists(filename):
             filename = path
-            # print("name of file: "+filename)
-            if os.path.exists(filename):
-                self.send_response(200)
-                self.send_header("Content-type", "image/svg+xml")
-                with open(filename, "rb") as file:
-                    content = file.read()
-                self.send_header("Content-length", len(content))
-                self.end_headers()
-                self.wfile.write(content)
-            else:
-                self.send_response(404)
-                self.send_header("Content-type", "text/html")
-                content = "404: requested file %s not found" % (self.path if self.path != '' else "index.html")
-                self.send_header("Content-length", len(content))
-                self.end_headers()
-                print(self.path)
-                self.wfile.write(bytes(content, "utf-8"))
-        
+            self.send_response(200)
+            self.send_header("Content-type", "image/svg+xml")
+            with open(filename, "rb") as file:
+                content = file.read()
+            self.send_header("Content-length", len(content))
+            self.end_headers()
+            self.wfile.write(content)
+            
         elif path.endswith(".css") and os.path.exists(path):
             self.send_response(200)
             self.send_header("Content-type", "text/css")
@@ -216,6 +212,7 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.send_header("Content-length", len(response_content))
                 self.end_headers()
                 self.wfile.write(bytes(response_content, "utf-8"))
+        
         else:
             self.send_response(404)
             self.send_header("Content-type", "text/html")
@@ -263,11 +260,11 @@ class MyHandler(BaseHTTPRequestHandler):
                                 <div class="row">
                                 <div class="column">
                                 <div class="outerInfoBox">
-                                    {box("Game Name: " + game_name)}<!--INSERT GAME NAME HERE-->
-                                    {box("Player One: " + player_one)}<!--INSERT PLAYER ONE HERE-->
-                                    {box("Player Two: " + player_two)}<!--INSERT PLAYER TWO HERE-->
-                                    {box("Current Player: " + MyHandler.current_game.current_player)}<!--INSERT CURRENT PLAYER HERE-->
-                                    {box("Table time: " + str(current_table.time))}<!--INSERT CURRENT TIME-->
+                                    {self.box("Game Name: " + game_name)}<!--INSERT GAME NAME HERE-->
+                                    {self.box("Player One: " + player_one)}<!--INSERT PLAYER ONE HERE-->
+                                    {self.box("Player Two: " + player_two)}<!--INSERT PLAYER TWO HERE-->
+                                    {self.box("Current Player: " + MyHandler.current_game.current_player)}<!--INSERT CURRENT PLAYER HERE-->
+                                    {self.box("Table time: " + str(current_table.time))}<!--INSERT CURRENT TIME-->
                                 </div> <!--for outer info box-->
                                 </div> <!---for column 1-->
                                 <div class="column">
@@ -290,12 +287,11 @@ class MyHandler(BaseHTTPRequestHandler):
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length).decode('utf-8')
             form_data = json.loads(post_data) # parse the json object sent from the javascript file
-            print("recieved shot request!")
             print(f"form JSON data: {form_data}")
             xvel: float = form_data.get("velocity").get("x_vel")
             yvel: float = form_data.get("velocity").get("y_vel")
             if not MyHandler.current_game:
-                print("NO GAME")
+                print("NO GAME. RESTART REQUIRED")
                 return
             number_of_svgs_to_flash = MyHandler.current_game.perform_shot(xvel, yvel)
             print("did shot math:", str(number_of_svgs_to_flash))
@@ -316,62 +312,42 @@ class MyHandler(BaseHTTPRequestHandler):
         
         return
 
-# no need to make this a class method
-def delete_SVGs_in_pwd() -> None:
-    from re import match
-    # Define the file name pattern to match
-    svg_pattern = r"^table-\d+\.svg$"
-    # Get a list of all files in the current directory
-    files_in_directory = os.listdir()
-    # print(str(svg_pattern))
-    # Iterate over the files and delete those matching the svg pattern
-    for file_name in files_in_directory:
-        if match(svg_pattern, file_name):
-            os.remove(file_name)
-            # print("removed file:" + file_name)
-    return
+    def reset_display_html(self) -> None:
+        content = """<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Make a shot!</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <div class="row">
+        <div class="column">
+        <div class="outerInfoBox">
+            <!--INSERT GAME NAME HERE-->
+            <!--INSERT PLAYER ONE HERE-->
+            <!--INSERT PLAYER TWO HERE-->
+            <!--INSERT CURRENT PLAYER HERE-->
+            <!--INSERT CURRENT TIME-->
+        </div> <!--for outer info box-->
+        </div> <!---for column 1-->
+        <div class="column">
+        <div class="svgTableDisplay">
+            <!--INSERT TABLE HERE-->
+            <svg id="svgLayer"></svg>
+        </div> <!--for svg-->
+        </div> <!--for column 2-->
+        </div> <!--for row-->
+        <script src="game.js"></script> <!--script should be at the end-->
+    </body>
+    </html>"""
+        with open("display.html", 'w') as file:
+            file.write(content)
+        return
 
-def reset_display_html() -> None:
-    content = """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Make a shot!</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div class="row">
-    <div class="column">
-    <div class="outerInfoBox">
-        <!--INSERT GAME NAME HERE-->
-        <!--INSERT PLAYER ONE HERE-->
-        <!--INSERT PLAYER TWO HERE-->
-        <!--INSERT CURRENT PLAYER HERE-->
-        <!--INSERT CURRENT TIME-->
-    </div> <!--for outer info box-->
-    </div> <!---for column 1-->
-    <div class="column">
-    <div class="svgTableDisplay">
-        <!--INSERT TABLE HERE-->
-        <svg id="svgLayer"></svg>
-    </div> <!--for svg-->
-    </div> <!--for column 2-->
-    </div> <!--for row-->
-    <script src="game.js"></script> <!--script should be at the end-->
-</body>
-</html>"""
-    with open("display.html", 'w') as file:
-        file.write(content)
-    return
-
-def box(string: str = None) -> str:
-    return f'<div class="infoBox">{string}</div>'
-
-def remove_video(video_file_name: str = "svg_movie", extension: str = "webm" ):
-    if os.path.exists(f'{video_file_name}.{extension}'):
-        os.remove(f"{video_file_name}.{extension}")
-    return
+    def box(self, string: str = None) -> str:
+        return f'<div class="infoBox">{string}</div>'
 
 def main() -> None:
     # if len(sys.argv) < 2:
