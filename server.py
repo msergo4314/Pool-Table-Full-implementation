@@ -31,7 +31,6 @@ def make_default_table() -> Physics.Table:
 
     # Define the number of rows and balls per row
     import math
-    balls_per_row = (1, 2, 3, 4, 5)
     ball_ordering = [1, 2, 9, 3, 8, 10, 4, 14, 7, 11, 12, 6, 15, 13, 5]
 
     root_3 = math.sqrt(3.0)
@@ -85,6 +84,10 @@ def write_svg(table_id, table, directory: str = "tables/"):
 
 class ServerGame(Physics.Game):
     
+    HIGH_BALLS = tuple(i for i in range(9, 16))
+    # exclude the 8 ball
+    LOW_BALLS = tuple(i for i in range(1, 8))
+    
     def __init__(self, gameName: str=None, player_one: str = None, player_two: str = None):
         from random import random
         super().__init__(gameName=gameName, player1Name=player_one, player2Name=player_two) # call Game class constructor
@@ -93,45 +96,89 @@ class ServerGame(Physics.Game):
         self.current_player : str = self.player1_name if random() > 0.5 else self.player2_name
         self.num_shots_made : int = 0
         self.set_High_low : bool = False
+        self.previous_shot_max_index : int = 0
+        self.player_1_score : int = 0
+        self.player_2_score : int = 0
+        self.cue_ball_sunk : bool = False
+        self.winner : str = None
+        print(f"NEW ID: {self.game_ID}")
+        self.open_cursor()
         return
     
     def switch_current_player(self):
+        x = self.current_player
         self.current_player = self.player2_name if self.current_player == self.player1_name else self.player1_name
-        print(f"switched to player: {self.current_player}")
+        print(f"switched to player: {self.current_player} from {x}")
         return
 
-    def perform_shot(self, x_vel, y_vel) -> int:
-        # returns the NUMBER OF TABLES generated from the shot
+    def perform_shot(self, x_vel, y_vel) -> tuple[tuple[str]]:
         self.num_shots_made += 1
-        end_tables: tuple[Physics.Table] = super().shoot(gameName=self.game_Name, playerName=self.current_player, table=self.most_recent_table, xvel=x_vel, yvel=y_vel)
-        # perform the shot
-        print(f"end_tables length: {len(end_tables)}")
-        # print("END TABLES:", *(str(i) for i in end_tables))
-        # for i, table in enumerate(end_tables):
-        #     # table = super().readTable()
-        #     write_svg(i,table)
-        self.database.database_to_file()
-        num_tables = super().get_number_of_tables_for_shot(self.num_shots_made) # this will go from 1 - num_tables
-        remove_svgs()
-        for i in range(num_tables):
-            write_svg(i, self.database.readTable(i))
-        generate_animation()
-        self.most_recent_table = self.database.readTable(num_tables - 1)
-        write_svg(0, self.most_recent_table, directory="special/")
+        self.cue_ball_sunk = False
+        # perform the shot. Split the current player for when (LOW) or (HIGH) are appended (will not be in db)
+        segments : tuple[Physics.Table] = super().shoot(gameName=self.game_Name, playerName=self.current_player.split(maxsplit=1)[0], table=self.most_recent_table, xvel=x_vel, yvel=y_vel)
+        self.analyze_segments(segments)
+        if self.cue_ball_sunk:
+            print("CUE BALL HAS BEEN SUNK")
+        print(f"number of segments: {len(segments)}")
+        # self.database.database_to_file()
+        num_tables = super().get_number_of_tables_for_shot() # this will go from 1 - num_tables
+        previous_max_index = self.previous_shot_max_index
+        svg_list = []
+        print(f"using i range: ({previous_max_index} - {num_tables + previous_max_index})")
+        for i in range(previous_max_index, previous_max_index + num_tables):
+            table = self.database.readTable(i)
+            svg_list.append((table.svg(), table.time))
+        self.previous_shot_max_index += num_tables
+        print(f"max shot changed from {self.previous_shot_max_index - num_tables} to {self.previous_shot_max_index}")
         self.switch_current_player()
-        return num_tables
-
-    def read_time(self, time : float) -> Union[Physics.Table, None]:
-        x = self.database.current_cursor.execute("SELECT 1 FROM TTable WHERE TTable.TIME = ?;", (time,)).fetchone()
-        if x:
-            x = x[0] - 1
+        # only update the most recent table to be the end of the shot when cue ball is still on the table
+        if not self.cue_ball_sunk:
+            self.most_recent_table = self.database.readTable(previous_max_index + num_tables - 1)
+        return tuple(svg_list)
+    
+    def analyze_segments(self, segments : tuple[Physics.Table]) -> None:
+        previous_table = self.most_recent_table
+        previous_balls = previous_table.balls_in_table()
+        for segment in segments:
+            segment_balls = segment.balls_in_table()
+            # print(segment_balls)
+            if len(segment_balls) != len(previous_balls):
+                for previous_ball in previous_balls:
+                    if not (previous_ball in segment_balls):
+                        # print(f"ball {default_ball} not found in segment balls")
+                        if previous_ball == 8:
+                            print("SUNK 8 BALL")
+                        if previous_ball == 0:
+                            self.cue_ball_sunk = True
+                            return
+                        if not self.set_High_low:
+                            if previous_ball in ServerGame.LOW_BALLS:
+                                print("SETTING CURRENT PLAYER LOW")
+                                self.set_high_low_values(" (LOW)")
+                            else:
+                                print("SETTING CURRENT PLAYER HIGH")
+                                self.set_high_low_values(" (HIGH)")
+                            self.set_High_low = True 
+                            return
+                            
+    
+    def set_high_low_values(self, high_or_low : str):
+        if self.current_player == self.player1_name:
+            self.player1_name += high_or_low
+            self.current_player = self.player1_name
+            self.player2_name += " (LOW)" if high_or_low == " (HIGH)" else " (HIGH)"
         else:
-            print("FATAL MATCH ERROR")
-            sys.exit(1)
-        return self.database.readTable(x)
+            self.player2_name += high_or_low
+            self.current_player = self.player2_name
+            self.player1_name += " (LOW)" if high_or_low == " (HIGH)" else " (HIGH)"
+        return
     
     def open_cursor(self):
         return super().open_cursor()
+    
+    def __del__(self):
+        # self.close()
+        return
 
 #################################################################################
 class MyHandler(BaseHTTPRequestHandler):
@@ -183,7 +230,7 @@ class MyHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(content)
         
-        elif path in "single_svg":
+        elif path == "single_svg":
             parsed_path = urlparse(self.path)
             query_params = parse_qs(parsed_path.query)
             if "time" in query_params:
@@ -213,6 +260,56 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(bytes(response_content, "utf-8"))
         
+        elif path == "display_game":
+            print("game display")
+            if MyHandler.current_game is None:
+                response_content = "<h1>NO GAME FOUND</h1>"
+                self.send_response(200)
+                self.send_header("Content-type", "text/html")
+                self.send_header("Content-length", len(response_content))
+                self.end_headers()
+                self.wfile.write(bytes(response_content, "utf-8"))    
+                return
+
+            game_name = MyHandler.current_game.game_Name
+            player_one = MyHandler.current_game.player1_name
+            player_two = MyHandler.current_game.player2_name
+            current_table = MyHandler.current_game.most_recent_table
+            # create game if it does not exist
+            response_content = f"""<!DOCTYPE html>
+                            <html lang="en">
+                            <head>
+                                <meta charset="UTF-8">
+                                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                <title>Make a shot!</title>
+                                <link rel="stylesheet" href="style.css">
+                            </head>
+                            <body>
+                                <div class="row">
+                                <div class="column">
+                                <div class="outerInfoBox">
+                                    {self.box("Game Name: " + game_name)} <!--INSERT GAME NAME HERE-->
+                                    {self.box("Player One: " + player_one)} <!--INSERT PLAYER ONE HERE-->
+                                    {self.box("Player Two: " + player_two)} <!--INSERT PLAYER TWO HERE-->
+                                    {self.box("Current Player: " + MyHandler.current_game.current_player)}<!--INSERT CURRENT PLAYER HERE-->
+                                    {f'<div class="infoBox" id="time">Table time: {str(round(current_table.time, 2))}</div>'} <!--INSERT CURRENT TIME-->
+                                </div> <!--for outer info box-->
+                                </div> <!---for column 1-->
+                                <div class="column">
+                                <div id="svgTableDisplay">
+                                    {current_table.svg()}<!--INSERT TABLE HERE-->
+                                    <svg id="svgLayer"></svg>
+                                </div> <!--for svg-->
+                                </div> <!--for column 2-->
+                                </div> <!--for row-->
+                            </body>
+                            </html>"""
+            self.send_response(200)
+            self.send_header("Content-type", "text/html")
+            self.send_header("Content-length", len(response_content))
+            self.end_headers()
+            self.wfile.write(bytes(response_content, "utf-8"))
+        
         else:
             self.send_response(404)
             self.send_header("Content-type", "text/html")
@@ -226,7 +323,6 @@ class MyHandler(BaseHTTPRequestHandler):
         path  = urlparse(self.path).path[1:]
         # receive form data from shoot.html
         if path == "display.html":
-            import math, random
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length).decode('utf-8')
             form_data = dict(parse_qsl(post_data))
@@ -244,10 +340,9 @@ class MyHandler(BaseHTTPRequestHandler):
             game_name = form_data.get("game_name", 'NAME NOT FOUND').strip()
             player_one = form_data.get("player_one", 'NAME NOT FOUND').strip()
             player_two = form_data.get("player_two", 'NAME NOT FOUND').strip()
-            # create game if it does not exist
             if MyHandler.current_game is None:
-                MyHandler.current_game = ServerGame(gameName=game_name, player_one=player_one, player_two=player_two) # initializze the game
-                current_table = MyHandler.current_game.most_recent_table
+                MyHandler.current_game = ServerGame(gameName=game_name, player_one=player_one, player_two=player_two) # initializze the game if it does not exist
+            current_table = MyHandler.current_game.most_recent_table
             response_content = f"""<!DOCTYPE html>
                             <html lang="en">
                             <head>
@@ -260,15 +355,15 @@ class MyHandler(BaseHTTPRequestHandler):
                                 <div class="row">
                                 <div class="column">
                                 <div class="outerInfoBox">
-                                    {self.box("Game Name: " + game_name)}<!--INSERT GAME NAME HERE-->
-                                    {self.box("Player One: " + player_one)}<!--INSERT PLAYER ONE HERE-->
-                                    {self.box("Player Two: " + player_two)}<!--INSERT PLAYER TWO HERE-->
+                                    {self.box("Game Name: " + game_name)} <!--INSERT GAME NAME HERE-->
+                                    {self.box("Player One: " + player_one)} <!--INSERT PLAYER ONE HERE-->
+                                    {self.box("Player Two: " + player_two)} <!--INSERT PLAYER TWO HERE-->
                                     {self.box("Current Player: " + MyHandler.current_game.current_player)}<!--INSERT CURRENT PLAYER HERE-->
-                                    {self.box("Table time: " + str(current_table.time))}<!--INSERT CURRENT TIME-->
+                                    {f'<div class="infoBox" id="time">Table time: {str(round(current_table.time, 2))}</div>'} <!--INSERT CURRENT TIME-->
                                 </div> <!--for outer info box-->
                                 </div> <!---for column 1-->
                                 <div class="column">
-                                <div class="svgTableDisplay">
+                                <div id="svgTableDisplay">
                                     {current_table.svg()}<!--INSERT TABLE HERE-->
                                     <svg id="svgLayer"></svg>
                                 </div> <!--for svg-->
@@ -282,6 +377,7 @@ class MyHandler(BaseHTTPRequestHandler):
             self.send_header("Content-length", len(response_content))
             self.end_headers()
             self.wfile.write(bytes(response_content, "utf-8"))
+            print("RESET")
     
         elif path == "new_shot":
             content_length = int(self.headers['Content-Length'])
@@ -293,9 +389,21 @@ class MyHandler(BaseHTTPRequestHandler):
             if not MyHandler.current_game:
                 print("NO GAME. RESTART REQUIRED")
                 return
-            number_of_svgs_to_flash = MyHandler.current_game.perform_shot(xvel, yvel)
-            print("did shot math:", str(number_of_svgs_to_flash))
-            response_content = f"{{\"total_time\": {round(MyHandler.current_game.most_recent_table.time, 2)}}}"
+            list_of_svgs = MyHandler.current_game.perform_shot(xvel, yvel)
+            # print("Number of SVGs:", str(len(list_of_svgs)))
+            json_content = [{"num_svgs": f'{len(list_of_svgs)}'}]
+            for i, (svg, time) in enumerate(list_of_svgs):
+                table_data = {
+                    f"table-{i}": svg,  # Remove leading/trailing whitespace from SVG
+                    f"table-{i}_time": time
+                }
+                json_content.append(table_data)
+            json_content.append({"cue_ball_sunk": MyHandler.current_game.cue_ball_sunk})
+            # json_content.append({"last_table": MyHandler.current_game.most_recent_table.svg()})
+            # json_content.append({"last_table_time": MyHandler.current_game.most_recent_table.time})
+            
+            # Convert the JSON object to a string
+            response_content = json.dumps(json_content)
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.send_header("Content-length", len(response_content))
@@ -348,27 +456,29 @@ class MyHandler(BaseHTTPRequestHandler):
 
     def box(self, string: str = None) -> str:
         return f'<div class="infoBox">{string}</div>'
-
+    
 def main() -> None:
     # if len(sys.argv) < 2:
     #     print("Need a command line argument!")
     #     # need to use exit instead of return
     #     sys.exit(1)  # Exit the script
-    from subprocess import DEVNULL
-    temp = Physics.Database(reset=True) # reset the database in case it has data
+    temp = Physics.Database(reset=True)
+    temp.close()
     del temp
+    from subprocess import DEVNULL
     remove_video()
     # port_num = int(sys.argv[1]) + int(5e4)
     port_num = 3000
     # d is for daemon
     httpd = HTTPServer(('localhost', port_num), MyHandler)
     # delete any SVG files currently existing
-    print("Server listing in port: ", port_num)
+    print("Server listening in port: ", port_num)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         print('\nCanceled with Ctrl + C')
         httpd.shutdown()
+        # MyHandler.current_game.close()
 
 if __name__ == "__main__":
     main()

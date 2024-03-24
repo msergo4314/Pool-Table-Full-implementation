@@ -430,7 +430,6 @@ phylib_table *phylib_segment(phylib_table *table) {
         // printf("table is NULL\n");
         return NULL;
     }
-    
     if (phylib_rolling(table) == 0) {
         // if no rollling balls return NULL
         return NULL;
@@ -441,7 +440,7 @@ phylib_table *phylib_segment(phylib_table *table) {
         while (time < PHYLIB_MAX_TIME) {
             for (int i = 0; i < PHYLIB_MAX_OBJECTS; i++) {
                 if (new_table->object[i] != NULL && (new_table->object)[i]->type == PHYLIB_ROLLING_BALL) {
-                    phylib_roll(new_table->object[i], (table->object)[i], time);
+                    phylib_roll((new_table->object)[i], (table->object)[i], time);
                 }
             }
             for (int i = 0; i < PHYLIB_MAX_OBJECTS; i++) {
@@ -453,7 +452,7 @@ phylib_table *phylib_segment(phylib_table *table) {
                         }
                     }
                 }
-                if (phylib_stopped(new_table->object[i])) {
+                if (phylib_stopped((new_table->object)[i])) {
                     goto function_exit;
                 }
             }
