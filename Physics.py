@@ -572,8 +572,8 @@ class Game:
 
         self.game_ID = gameID
         self.game_Name = gameName
-        self.player1_name = player1Name
-        self.player2_name = player2Name
+        self.player1_name : str = player1Name
+        self.player2_name : str = player2Name
 
         arguments = (gameID, gameName, player1Name, player2Name)
         if isinstance(gameID, int) and all(obj is None for obj in arguments[1:]):
@@ -616,6 +616,8 @@ class Game:
         table_ID_list : list[int] = []
         self.open_cursor()
         count = 0
+        from time import perf_counter
+        start = perf_counter()
         while table:
             count += 1
             if (current_segment := table.segment()) is None:
@@ -638,6 +640,7 @@ class Game:
         self.most_recent_shot_ID = shot_ID
         Game.current_cursor.executemany("INSERT INTO TableShot (TABLEID, SHOTID) VALUES (?, ?);", (table_shot_values))
         self.database.current_database_connection.commit()
+        print(f"SHOT TIME: {perf_counter() - start:.6f}")
         self.close_cursor()
         return tuple(list_of_segments)
 

@@ -3,6 +3,7 @@
 import os, Physics, sys, json # sys used to get argv, os for file operations, Physics for phylib library access, json for post request data
 from typing import Union
 from subprocess import run, CalledProcessError, DEVNULL
+from time import perf_counter
 
 NUM_PADDED_ZEROES = 5
 extension = "webm"
@@ -100,20 +101,26 @@ class ServerGame(Physics.Game):
         self.player_1_score : int = 0
         self.player_2_score : int = 0
         self.cue_ball_sunk : bool = False
+        self.cue_ball_sunk : bool = False
+        self.eight_ball_sunk : bool = False
+        self.eight_ball_sunk_invalid : bool = False
+        self.eight_ball_sunk_valid : bool = False
         self.winner : str = None
         print(f"NEW ID: {self.game_ID}")
         self.open_cursor()
         return
     
-    def switch_current_player(self):
+    def switch_current_player(self) -> None:
         x = self.current_player
-        self.current_player = self.player2_name if self.current_player == self.player1_name else self.player1_name
+        self.current_player = self.player2_name if x == self.player1_name else self.player1_name
         print(f"switched to player: {self.current_player} from {x}")
         return
 
     def perform_shot(self, x_vel, y_vel) -> tuple[tuple[str]]:
         self.num_shots_made += 1
         self.cue_ball_sunk = False
+        self.eight_ball_sunk = False
+        self.extra_turn = False
         # perform the shot. Split the current player for when (LOW) or (HIGH) are appended (will not be in db)
         segments : tuple[Physics.Table] = super().shoot(gameName=self.game_Name, playerName=self.current_player.split(maxsplit=1)[0], table=self.most_recent_table, xvel=x_vel, yvel=y_vel)
         self.analyze_segments(segments)
@@ -130,10 +137,14 @@ class ServerGame(Physics.Game):
             svg_list.append((table.svg(), table.time))
         self.previous_shot_max_index += num_tables
         print(f"max shot changed from {self.previous_shot_max_index - num_tables} to {self.previous_shot_max_index}")
-        self.switch_current_player()
         # only update the most recent table to be the end of the shot when cue ball is still on the table
-        if not self.cue_ball_sunk:
-            self.most_recent_table = self.database.readTable(previous_max_index + num_tables - 1)
+        
+        self.most_recent_table = self.database.readTable(previous_max_index + num_tables - 1)
+        if self.cue_ball_sunk:
+            #insert the cue ball at starting position. If there happens to be a ball there, things will break.
+            self.most_recent_table += Physics.StillBall(0, Physics.Coordinate(Physics.TABLE_WIDTH / 2.0, Physics.TABLE_LENGTH - Physics.TABLE_WIDTH / 2.0))
+        if not self.extra_turn:
+            self.switch_current_player()
         return tuple(svg_list)
     
     def analyze_segments(self, segments : tuple[Physics.Table]) -> None:
@@ -148,20 +159,44 @@ class ServerGame(Physics.Game):
                         # print(f"ball {default_ball} not found in segment balls")
                         if previous_ball == 8:
                             print("SUNK 8 BALL")
+                            self.eight_ball_sunk = True
+                            if len(previous_balls) == 2:
+                                # case for only cue ball and 8 ball
+                                self.eight_ball_sunk_valid = True
+                            else:
+                                # should immediately end the game and make current player the loser
+                                self.eight_ball_sunk_invalid = True
+                            return
                         if previous_ball == 0:
                             self.cue_ball_sunk = True
-                            return
-                        if not self.set_High_low:
+                        # if the HIGH/LOW waas not yet set
+                        if self.set_High_low is False:
                             if previous_ball in ServerGame.LOW_BALLS:
                                 print("SETTING CURRENT PLAYER LOW")
                                 self.set_high_low_values(" (LOW)")
                             else:
                                 print("SETTING CURRENT PLAYER HIGH")
                                 self.set_high_low_values(" (HIGH)")
-                            self.set_High_low = True 
                             return
-                            
-    
+                        
+                        else:
+                            if (self.current_player.endswith(" (LOW)") and previous_ball in ServerGame.LOW_BALLS) or \
+                                (self.current_player.endswith(" (HIGH)") and previous_ball in ServerGame.HIGH_BALLS):
+                                self.increase_player_score()
+                            else:
+                                opposite_player : str = self.player1_name if self.current_player == self.player1_name else self.player2_name
+                                self.increase_player_score(player_to_increment_score=opposite_player)
+                        
+    def increase_player_score(self, player_to_increment_score : str = ''):
+        if not player_to_increment_score:
+            # have to do it at runtime
+            player_to_increment_score = self.current_player
+        if player_to_increment_score == self.player1_name.split(maxsplit=1)[0]:
+            self.player_1_score += 1
+        elif player_to_increment_score == self.player2_name.split(maxsplit=1)[0]:
+            self.player_2_score += 1
+        return    
+        
     def set_high_low_values(self, high_or_low : str):
         if self.current_player == self.player1_name:
             self.player1_name += high_or_low
@@ -171,6 +206,8 @@ class ServerGame(Physics.Game):
             self.player2_name += high_or_low
             self.current_player = self.player2_name
             self.player1_name += " (LOW)" if high_or_low == " (HIGH)" else " (HIGH)"
+        self.increase_player_score()
+        self.set_High_low = True # never need to set again
         return
     
     def open_cursor(self):

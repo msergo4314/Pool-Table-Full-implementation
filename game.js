@@ -195,8 +195,8 @@ async function handleShotData(shotData) {
             await new Promise(resolve => setTimeout(resolve, REFESH_TIME));
         }
         if (JSONData[num_svgs + 1].cue_ball_sunk) {
-            console.log("CUE BALL WAS SUNK! Reverting to last shot...");
-            window.alert(`The Cue ball was sunk. Reverting to last table position.\n`);
+            console.log("CUE BALL WAS SUNK!");
+            window.alert(`The Cue ball was sunk. Reverting cue ball position to initial spot.\n`);
         }
         refreshPage();
     } catch (error) {
