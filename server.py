@@ -85,9 +85,8 @@ def write_svg(table_id, table, directory: str = "tables/"):
 
 class ServerGame(Physics.Game):
     
-    HIGH_BALLS = tuple(i for i in range(9, 16))
-    # exclude the 8 ball
-    LOW_BALLS = tuple(i for i in range(1, 8))
+    SVG_BALL_DISPLAY_X : int = 500
+    SVG_BALL_DISPLAY_Y : int = 70
     
     def __init__(self, gameName: str=None, player_one: str = None, player_two: str = None):
         from random import random
@@ -96,7 +95,7 @@ class ServerGame(Physics.Game):
         self.most_recent_table : Physics.Table = make_default_table() # initially the game will have the default table
         self.current_player : str = self.player1_name if random() > 0.5 else self.player2_name
         self.num_shots_made : int = 0
-        self.set_High_low : bool = False
+        self.set_high_low : bool = False
         self.previous_shot_max_index : int = 0
         self.player_1_score : int = 0
         self.player_2_score : int = 0
@@ -106,6 +105,10 @@ class ServerGame(Physics.Game):
         self.eight_ball_sunk_invalid : bool = False
         self.eight_ball_sunk_valid : bool = False
         self.winner : str = None
+        # exclude the 8 ball and the cue ball from both lists
+        # use lists not a tuple because the lists will be shortened as the game progresses
+        self.high_balls = [i for i in range(9, 16)]
+        self.low_balls = [i for i in range(1, 8)]
         print(f"NEW ID: {self.game_ID}")
         self.open_cursor()
         return
@@ -119,7 +122,6 @@ class ServerGame(Physics.Game):
     def perform_shot(self, x_vel, y_vel) -> tuple[tuple[str]]:
         self.num_shots_made += 1
         self.cue_ball_sunk = False
-        self.eight_ball_sunk = False
         self.extra_turn = False
         # perform the shot. Split the current player for when (LOW) or (HIGH) are appended (will not be in db)
         segments : tuple[Physics.Table] = super().shoot(gameName=self.game_Name, playerName=self.current_player.split(maxsplit=1)[0], table=self.most_recent_table, xvel=x_vel, yvel=y_vel)
@@ -137,9 +139,9 @@ class ServerGame(Physics.Game):
             svg_list.append((table.svg(), table.time))
         self.previous_shot_max_index += num_tables
         print(f"max shot changed from {self.previous_shot_max_index - num_tables} to {self.previous_shot_max_index}")
-        # only update the most recent table to be the end of the shot when cue ball is still on the table
         
         self.most_recent_table = self.database.readTable(previous_max_index + num_tables - 1)
+        print(self.most_recent_table)
         if self.cue_ball_sunk:
             #insert the cue ball at starting position. If there happens to be a ball there, things will break.
             self.most_recent_table += Physics.StillBall(0, Physics.Coordinate(Physics.TABLE_WIDTH / 2.0, Physics.TABLE_LENGTH - Physics.TABLE_WIDTH / 2.0))
@@ -148,8 +150,7 @@ class ServerGame(Physics.Game):
         return tuple(svg_list)
     
     def analyze_segments(self, segments : tuple[Physics.Table]) -> None:
-        previous_table = self.most_recent_table
-        previous_balls = previous_table.balls_in_table()
+        previous_balls = self.most_recent_table.balls_in_table()
         for segment in segments:
             segment_balls = segment.balls_in_table()
             # print(segment_balls)
@@ -163,37 +164,44 @@ class ServerGame(Physics.Game):
                             if len(previous_balls) == 2:
                                 # case for only cue ball and 8 ball
                                 self.eight_ball_sunk_valid = True
+                                print("VALID 8 BALL SUNK")
                             else:
                                 # should immediately end the game and make current player the loser
                                 self.eight_ball_sunk_invalid = True
+                                print("INVALID 8 BALL SUNK")
                             return
                         if previous_ball == 0:
                             self.cue_ball_sunk = True
+                            continue
                         # if the HIGH/LOW waas not yet set
-                        if self.set_High_low is False:
-                            if previous_ball in ServerGame.LOW_BALLS:
-                                print("SETTING CURRENT PLAYER LOW")
+                        if self.set_high_low is False:
+                            if previous_ball in self.low_balls:
+                                print(f"SETTING CURRENT PLAYER {self.current_player} LOW")
                                 self.set_high_low_values(" (LOW)")
+                                self.low_balls.remove(previous_ball)
                             else:
-                                print("SETTING CURRENT PLAYER HIGH")
+                                print(f"SETTING CURRENT PLAYER {self.current_player} HIGH")
                                 self.set_high_low_values(" (HIGH)")
-                            return
+                                self.high_balls.remove(previous_ball)
+                            continue
                         
                         else:
-                            if (self.current_player.endswith(" (LOW)") and previous_ball in ServerGame.LOW_BALLS) or \
-                                (self.current_player.endswith(" (HIGH)") and previous_ball in ServerGame.HIGH_BALLS):
-                                self.increase_player_score()
-                            else:
-                                opposite_player : str = self.player1_name if self.current_player == self.player1_name else self.player2_name
-                                self.increase_player_score(player_to_increment_score=opposite_player)
+                            if (self.current_player.endswith(" (LOW)") and previous_ball in self.low_balls):
+                                self.low_balls.remove(previous_ball)
+                            elif (self.current_player.endswith(" (HIGH)") and previous_ball in self.high_balls):
+                                self.high_balls.remove(previous_ball)
+                            self.increase_player_score()
+            previous_balls = segment_balls
                         
     def increase_player_score(self, player_to_increment_score : str = ''):
         if not player_to_increment_score:
             # have to do it at runtime
             player_to_increment_score = self.current_player
-        if player_to_increment_score == self.player1_name.split(maxsplit=1)[0]:
+        if self.player1_name.split(maxsplit=1)[0] in player_to_increment_score:
+            print("incremented p1")
             self.player_1_score += 1
-        elif player_to_increment_score == self.player2_name.split(maxsplit=1)[0]:
+        elif self.player2_name.split(maxsplit=1)[0] in player_to_increment_score:
+            print("incremented p2")
             self.player_2_score += 1
         return    
         
@@ -207,7 +215,7 @@ class ServerGame(Physics.Game):
             self.current_player = self.player2_name
             self.player1_name += " (LOW)" if high_or_low == " (HIGH)" else " (HIGH)"
         self.increase_player_score()
-        self.set_High_low = True # never need to set again
+        self.set_high_low = True # never need to set again
         return
     
     def open_cursor(self):
@@ -216,6 +224,65 @@ class ServerGame(Physics.Game):
     def __del__(self):
         # self.close()
         return
+
+    def high_balls_svg(self) -> str:
+        # Define rectangle dimensions
+        rect_width = ServerGame.SVG_BALL_DISPLAY_X
+        rect_height = ServerGame.SVG_BALL_DISPLAY_Y
+        
+        # Start SVG string with rectangle
+        svg_string = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+                        <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+                        "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+                        <svg width="{rect_width}" height="{rect_height}"
+                        xmlns="http://www.w3.org/2000/svg"
+                        xmlns:xlink="http://www.w3.org/1999/xlink">"""
+        svg_string += f'<rect x="0" y="0" width="{rect_width}" height="{rect_height}" fill="none"/>'
+
+        # Calculate spacing for circles
+        num_high_balls = len(self.high_balls)
+        circle_spacing = rect_width / (num_high_balls + 1)
+        
+        # Add circles for high balls
+        for i, ball_number in enumerate(self.high_balls):
+            cx = circle_spacing * (i + 1)
+            cy = rect_height / 2
+            # Add main colored circle for the ball itself
+            svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS}" fill="{Physics.BALL_COLOURS[ball_number]}" />'
+            # Add smaller white circle for ball number
+            svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS/2}" fill="white" />'
+            # Add text inside the white circle
+            svg_string += f'<text x="{cx}" y="{cy + 4}" text-anchor="middle" alignment-baseline="middle" fill="black" font-size="{Physics.BALL_RADIUS/2}px" font-weight="bold">{ball_number}</text>'
+            
+        svg_string += '</svg>'
+        return svg_string
+
+    def low_balls_svg(self) -> str:
+        rect_width = ServerGame.SVG_BALL_DISPLAY_X
+        rect_height = ServerGame.SVG_BALL_DISPLAY_Y
+        svg_string = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+                        <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+                        "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+                        <svg width="{rect_width}" height="{rect_height}"
+                        xmlns="http://www.w3.org/2000/svg"
+                        xmlns:xlink="http://www.w3.org/1999/xlink">"""
+        svg_string += f'<rect x="0" y="0" width="{rect_width}" height="{rect_height}" fill="none"/>'
+        # Calculate spacing for circles
+        num_low_balls = len(self.low_balls)
+        circle_spacing = rect_width / (num_low_balls + 1)
+        # Add circles for high balls
+        for i, ball_number in enumerate(self.low_balls):
+            cx = circle_spacing * (i + 1)
+            cy = rect_height / 2
+            # Add main colored circle for the ball itself
+            svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS}" fill="{Physics.BALL_COLOURS[ball_number]}" />'
+            # Add smaller white circle for ball number
+            svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS/2}" fill="white" />'
+            # Add text inside the white circle
+            svg_string += f'<text x="{cx}" y="{cy + 4}" text-anchor="middle" alignment-baseline="middle" fill="black" font-size="{Physics.BALL_RADIUS/2}px" font-weight="bold">{ball_number}</text>'
+            
+        svg_string += '</svg>'
+        return svg_string
 
 #################################################################################
 class MyHandler(BaseHTTPRequestHandler):
@@ -307,40 +374,11 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(bytes(response_content, "utf-8"))    
                 return
-
-            game_name = MyHandler.current_game.game_Name
-            player_one = MyHandler.current_game.player1_name
-            player_two = MyHandler.current_game.player2_name
-            current_table = MyHandler.current_game.most_recent_table
-            # create game if it does not exist
-            response_content = f"""<!DOCTYPE html>
-                            <html lang="en">
-                            <head>
-                                <meta charset="UTF-8">
-                                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                                <title>Make a shot!</title>
-                                <link rel="stylesheet" href="style.css">
-                            </head>
-                            <body>
-                                <div class="row">
-                                <div class="column">
-                                <div class="outerInfoBox">
-                                    {self.box("Game Name: " + game_name)} <!--INSERT GAME NAME HERE-->
-                                    {self.box("Player One: " + player_one)} <!--INSERT PLAYER ONE HERE-->
-                                    {self.box("Player Two: " + player_two)} <!--INSERT PLAYER TWO HERE-->
-                                    {self.box("Current Player: " + MyHandler.current_game.current_player)}<!--INSERT CURRENT PLAYER HERE-->
-                                    {f'<div class="infoBox" id="time">Table time: {str(round(current_table.time, 2))}</div>'} <!--INSERT CURRENT TIME-->
-                                </div> <!--for outer info box-->
-                                </div> <!---for column 1-->
-                                <div class="column">
-                                <div id="svgTableDisplay">
-                                    {current_table.svg()}<!--INSERT TABLE HERE-->
-                                    <svg id="svgLayer"></svg>
-                                </div> <!--for svg-->
-                                </div> <!--for column 2-->
-                                </div> <!--for row-->
-                            </body>
-                            </html>"""
+            
+            response_content = self.generate_display_html(current_game= MyHandler.current_game, \
+                game_name=MyHandler.current_game.game_Name, \
+                player_one=MyHandler.current_game.player1_name,\
+                player_two=MyHandler.current_game.player2_name)
             self.send_response(200)
             self.send_header("Content-type", "text/html")
             self.send_header("Content-length", len(response_content))
@@ -358,7 +396,8 @@ class MyHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path  = urlparse(self.path).path[1:]
-        # receive form data from shoot.html
+        
+        # this case will occur for the initial game setup
         if path == "display.html":
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length).decode('utf-8')
@@ -379,36 +418,7 @@ class MyHandler(BaseHTTPRequestHandler):
             player_two = form_data.get("player_two", 'NAME NOT FOUND').strip()
             if MyHandler.current_game is None:
                 MyHandler.current_game = ServerGame(gameName=game_name, player_one=player_one, player_two=player_two) # initializze the game if it does not exist
-            current_table = MyHandler.current_game.most_recent_table
-            response_content = f"""<!DOCTYPE html>
-                            <html lang="en">
-                            <head>
-                                <meta charset="UTF-8">
-                                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                                <title>Make a shot!</title>
-                                <link rel="stylesheet" href="style.css">
-                            </head>
-                            <body>
-                                <div class="row">
-                                <div class="column">
-                                <div class="outerInfoBox">
-                                    {self.box("Game Name: " + game_name)} <!--INSERT GAME NAME HERE-->
-                                    {self.box("Player One: " + player_one)} <!--INSERT PLAYER ONE HERE-->
-                                    {self.box("Player Two: " + player_two)} <!--INSERT PLAYER TWO HERE-->
-                                    {self.box("Current Player: " + MyHandler.current_game.current_player)}<!--INSERT CURRENT PLAYER HERE-->
-                                    {f'<div class="infoBox" id="time">Table time: {str(round(current_table.time, 2))}</div>'} <!--INSERT CURRENT TIME-->
-                                </div> <!--for outer info box-->
-                                </div> <!---for column 1-->
-                                <div class="column">
-                                <div id="svgTableDisplay">
-                                    {current_table.svg()}<!--INSERT TABLE HERE-->
-                                    <svg id="svgLayer"></svg>
-                                </div> <!--for svg-->
-                                </div> <!--for column 2-->
-                                </div> <!--for row-->
-                                <script src="game.js"></script> <!--script should be at the end-->
-                            </body>
-                            </html>"""
+            response_content = self.generate_display_html(current_game= MyHandler.current_game, game_name=game_name, player_one=player_one, player_two=player_two)
             self.send_response(200)
             self.send_header("Content-type", "text/html")
             self.send_header("Content-length", len(response_content))
@@ -426,13 +436,14 @@ class MyHandler(BaseHTTPRequestHandler):
             if not MyHandler.current_game:
                 print("NO GAME. RESTART REQUIRED")
                 return
-            list_of_svgs = MyHandler.current_game.perform_shot(xvel, yvel)
+            game = MyHandler.current_game
+            list_of_svgs = game.perform_shot(xvel, yvel)
             # print("Number of SVGs:", str(len(list_of_svgs)))
             json_content = [{"num_svgs": f'{len(list_of_svgs)}'}]
             for i, (svg, time) in enumerate(list_of_svgs):
                 table_data = {
                     f"table-{i}": svg,  # Remove leading/trailing whitespace from SVG
-                    f"table-{i}_time": time
+                    f"table-{i}_time": time, 
                 }
                 json_content.append(table_data)
             json_content.append({"cue_ball_sunk": MyHandler.current_game.cue_ball_sunk})
@@ -457,42 +468,45 @@ class MyHandler(BaseHTTPRequestHandler):
         
         return
 
-    def reset_display_html(self) -> None:
-        content = """<!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Make a shot!</title>
-        <link rel="stylesheet" href="style.css">
-    </head>
-    <body>
-        <div class="row">
-        <div class="column">
-        <div class="outerInfoBox">
-            <!--INSERT GAME NAME HERE-->
-            <!--INSERT PLAYER ONE HERE-->
-            <!--INSERT PLAYER TWO HERE-->
-            <!--INSERT CURRENT PLAYER HERE-->
-            <!--INSERT CURRENT TIME-->
-        </div> <!--for outer info box-->
-        </div> <!---for column 1-->
-        <div class="column">
-        <div class="svgTableDisplay">
-            <!--INSERT TABLE HERE-->
-            <svg id="svgLayer"></svg>
-        </div> <!--for svg-->
-        </div> <!--for column 2-->
-        </div> <!--for row-->
-        <script src="game.js"></script> <!--script should be at the end-->
-    </body>
-    </html>"""
-        with open("display.html", 'w') as file:
-            file.write(content)
-        return
+    def generate_display_html(self, current_game : ServerGame, game_name : str, player_one : str, player_two : str) -> None:
+        current_table = current_game.most_recent_table
+        response_content = f"""<!DOCTYPE html>
+                            <html lang="en">
+                            <head>
+                                <meta charset="UTF-8">
+                                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                <title>Make a shot!</title>
+                                <link rel="stylesheet" href="style.css">
+                            </head>
+                            <body>
+                                <div class="row">
+                                <div class="column">
+                                <div class="outerInfoBox">
+                                    {self.box("Game Name: " + game_name)} <!--INSERT GAME NAME HERE-->
+                                    {self.box("Player One: " + player_one)} <!--INSERT PLAYER ONE HERE-->
+                                    {self.box("Player Two: " + player_two)} <!--INSERT PLAYER TWO HERE-->
+                                    {self.box("Table time: " + str(round(current_table.time, 2)), ID="time")} <!--INSERT CURRENT TIME-->
+                                    {self.box("Player one score:" + str(current_game.player_1_score), ID="p1score")} <!--INSERT PLAYER ONE SCORE HERE-->
+                                    {self.box("Player two score:" + str(current_game.player_2_score), ID="p2score")} <!--INSERT PLAYER TWO SCORE HERE-->
+                                    {self.box("Current Player: " + current_game.current_player)}<!--INSERT CURRENT PLAYER HERE-->
+                                    {self.box("Current LOW balls:" + current_game.low_balls_svg())} <!--INSERT LOW BALLS SVG HERE-->
+                                    {self.box("Current HIGH balls:" + current_game.high_balls_svg())} <!--INSERT HIGH BALLS SVG HERE-->
+                                </div> <!--for outer info box-->
+                                </div> <!---for column 1-->
+                                <div class="column">
+                                <div id="svgTableDisplay">
+                                    {current_table.svg()}<!--INSERT TABLE HERE-->
+                                    <svg id="svgLayer"></svg>
+                                </div> <!--for svg-->
+                                </div> <!--for column 2-->
+                                </div> <!--for row-->
+                                <script src="game.js"></script> <!--script should be at the end-->
+                            </body>
+                            </html>"""
+        return response_content
 
-    def box(self, string: str = None) -> str:
-        return f'<div class="infoBox">{string}</div>'
+    def box(self, string: str = None, ID : str = "") -> str:
+        return f'<div class="infoBox">{string}</div>' if ID == '' else f'<div class="infoBox" id=\"{ID}\">{string}</div>'
     
 def main() -> None:
     # if len(sys.argv) < 2:

@@ -186,8 +186,7 @@ function sendShotData(shotData) {
 async function handleShotData(shotData) {
     try {
         const JSONData = await sendShotData(shotData);
-        console.log(JSONData);
-        console.log(JSONData.length);
+        // console.log(JSONData);
         let num_svgs = Number(JSONData[0].num_svgs)
         console.log("number of svgs: " + num_svgs, typeof(num_svgs));
         for (let i = 1; i < num_svgs; i++) {

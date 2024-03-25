@@ -112,7 +112,7 @@ class RollingBall(phylib.phylib_object):
 
     # add an svg method here
     def svg(self):
-        return """ <circle id="%02d" cx="%d" cy="%d" r="%d" fill="%s" />\n""" % (self.obj.rolling_ball.number, self.obj.rolling_ball.pos.x,self.obj.rolling_ball.pos.y,\
+        return """ <circle cx="%d" cy="%d" r="%d" fill="%s" />\n""" % (self.obj.rolling_ball.pos.x,self.obj.rolling_ball.pos.y,\
         BALL_RADIUS, BALL_COLOURS[self.obj.rolling_ball.number])
 
 ################################################################################
@@ -633,13 +633,13 @@ class Game:
             table_ID_list.append(Game.database.writeTable(current_segment)  + 1)
             list_of_segments.append(current_segment)
             table = current_segment
-            if count >= 1000:
+            if count >= 500:
                 print("TOO MANY SEGMENTS")
                 return
         table_shot_values = [(table_ID, shot_ID) for table_ID in table_ID_list]
         self.most_recent_shot_ID = shot_ID
         Game.current_cursor.executemany("INSERT INTO TableShot (TABLEID, SHOTID) VALUES (?, ?);", (table_shot_values))
-        self.database.current_database_connection.commit()
+        # self.database.current_database_connection.commit()
         print(f"SHOT TIME: {perf_counter() - start:.6f}")
         self.close_cursor()
         return tuple(list_of_segments)
