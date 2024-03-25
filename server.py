@@ -151,13 +151,13 @@ class ServerGame(Physics.Game):
         if self.cue_ball_sunk:
             #insert the cue ball at starting position. If there happens to be a ball there, things will break.
             self.most_recent_table += Physics.StillBall(0, Physics.Coordinate(Physics.TABLE_WIDTH / 2.0, Physics.TABLE_LENGTH - Physics.TABLE_WIDTH / 2.0))
-        if not self.extra_turn:
-            self.switch_current_player()
         if self.eight_ball_sunk:
             if self.eight_ball_sunk_invalid:
                 self.winner = self.other_player.split()[0]
             elif self.eight_ball_sunk_valid:
                 self.winner = self.current_player.split()[0]
+        if not self.extra_turn or self.cue_ball_sunk:
+            self.switch_current_player()
         return tuple(svg_list)
     
     def analyze_segments(self, segments : tuple[Physics.Table]) -> None:
@@ -518,10 +518,50 @@ class MyHandler(BaseHTTPRequestHandler):
         
         return
 
-    def generate_display_html(self, current_game : ServerGame, game_name : str, player_one : str, player_two : str) -> None:
+    def generate_display_html(self, current_game : ServerGame, game_name : str, player_one : str, player_two : str) -> str:
         current_table = current_game.most_recent_table
         if current_game.winner:
-            response_content = f"""<!DOCTYPE html>
+            return self.generate_winner_display_html(current_game.winner)
+        # {self.box("Current Game ID:" + str(current_game.game_ID))} <!--INSERT GAME ID HERE-->
+        
+        response_content = f"""<!DOCTYPE html>
+                            <html lang="en">
+                            <head>
+                                <meta charset="UTF-8">
+                                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                <title>Make a shot!</title>
+                                <link rel="stylesheet" href="style.css">
+                            </head>
+                            <body>
+                                <div class="row">
+                                <div class="column">
+                                <div class="outerInfoBox">
+                                    {self.box('<div class="infoBoxLeadingText">Game Name: </div>' + game_name)}
+                                    {self.box('<div class="infoBoxLeadingText">Player One: </div>' + player_one)}
+                                    {self.box('<div class="infoBoxLeadingText">Player Two: </div>' + player_two)}
+                                    {self.box('<div class="infoBoxLeadingText">Table time: </div>' + str(round(current_table.time, 2)), ID="time")}
+                                    {self.box('<div class="infoBoxLeadingText">Player one score: </div>' + str(current_game.player_1_score), ID="p1score")}
+                                    {self.box('<div class="infoBoxLeadingText">Player two score: </div>' + str(current_game.player_2_score), ID="p2score")}
+                                    {self.box('<div class="infoBoxLeadingText">Current Player: </div>' + current_game.current_player)}
+                                    {self.box('<div class="infoBoxLeadingText">Current LOW balls: </div>' + current_game.low_balls_svg())}
+                                    {self.box('<div class="infoBoxLeadingText">Current HIGH balls: </div>' + current_game.high_balls_svg())}
+                                    {self.box('<div class="infoBoxLeadingText">Sunk balls: </div>' + current_game.sunk_balls_svg())}
+                                </div> <!--for outer info box-->
+                                </div> <!---for column 1-->
+                                <div class="column">
+                                <div id="svgTableDisplay">
+                                    {current_table.svg()}<!--INSERT TABLE HERE-->
+                                    <svg id="svgLayer"></svg>
+                                </div> <!--for svg-->
+                                </div> <!--for column 2-->
+                                </div> <!--for row-->
+                                <script src="game.js"></script> <!--script should be at the end-->
+                            </body>
+                            </html>"""
+        return response_content
+
+    def generate_winner_display_html(winner : str):
+        response_content = f"""<!DOCTYPE html>
                                 <html lang="en">
                                 <head>
                                     <meta charset="UTF-8">
@@ -552,48 +592,12 @@ class MyHandler(BaseHTTPRequestHandler):
                                 <body>
                                     <div class="winner-container">
                                         <p class="winner-text">Winner:</p>
-                                        <p class="winner-name">{current_game.winner}</p>
+                                        <p class="winner-name">{winner}</p>
                                     </div>
                                 </body>
                                 </html>"""
-            return response_content
-        response_content = f"""<!DOCTYPE html>
-                            <html lang="en">
-                            <head>
-                                <meta charset="UTF-8">
-                                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                                <title>Make a shot!</title>
-                                <link rel="stylesheet" href="style.css">
-                            </head>
-                            <body>
-                                <div class="row">
-                                <div class="column">
-                                <div class="outerInfoBox">
-                                    {self.box("Game Name: " + game_name)} <!--INSERT GAME NAME HERE-->
-                                    {self.box("Player One: " + player_one)} <!--INSERT PLAYER ONE HERE-->
-                                    {self.box("Player Two: " + player_two)} <!--INSERT PLAYER TWO HERE-->
-                                    {self.box("Table time: " + str(round(current_table.time, 2)), ID="time")} <!--INSERT CURRENT TIME-->
-                                    {self.box("Player one score:" + str(current_game.player_1_score), ID="p1score")} <!--INSERT PLAYER ONE SCORE HERE-->
-                                    {self.box("Player two score:" + str(current_game.player_2_score), ID="p2score")} <!--INSERT PLAYER TWO SCORE HERE-->
-                                    {self.box("Current Player: " + current_game.current_player)}<!--INSERT CURRENT PLAYER HERE-->
-                                    {self.box("Current LOW balls:" + current_game.low_balls_svg())} <!--INSERT LOW BALLS SVG HERE-->
-                                    {self.box("Current HIGH balls:" + current_game.high_balls_svg())} <!--INSERT HIGH BALLS SVG HERE-->
-                                    {self.box("Current Game ID:" + str(current_game.game_ID))} <!--INSERT GAME ID HERE-->
-                                    {self.box("Sunk balls:" + current_game.sunk_balls_svg())} <!--INSERT SUNK BALLS SVG HERE-->
-                                </div> <!--for outer info box-->
-                                </div> <!---for column 1-->
-                                <div class="column">
-                                <div id="svgTableDisplay">
-                                    {current_table.svg()}<!--INSERT TABLE HERE-->
-                                    <svg id="svgLayer"></svg>
-                                </div> <!--for svg-->
-                                </div> <!--for column 2-->
-                                </div> <!--for row-->
-                                <script src="game.js"></script> <!--script should be at the end-->
-                            </body>
-                            </html>"""
         return response_content
-
+    
     def box(self, string: str = None, ID : str = "") -> str:
         return f'<div class="infoBox">{string}</div>' if ID == '' else f'<div class="infoBox" id=\"{ID}\">{string}</div>'
     

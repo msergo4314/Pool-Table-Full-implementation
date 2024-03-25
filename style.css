@@ -1,7 +1,7 @@
 body{
     font-family: Verdana;
     font-size: 1.5rem;
-    background-color: rgba(219, 216, 216, 0.556);
+    background-color: rgba(107, 96, 96, 0.445);
 }
 h1{
     font-size: 2.4rem;
@@ -12,10 +12,16 @@ h2{
     font-size: 1rem;
     color: rgb(236, 77, 48);
 }
+.formBox {
+    /* position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%); */
+}
 form{
     background-color: hsl(180, 2%, 88%);
     text-align: center;
-    max-width: 500px;
+    max-width: 600px;
     margin: auto;
     padding: 5px;
     border-radius: 5px;
@@ -24,15 +30,25 @@ form{
 }
 .outerInfoBox{
     text-align: center;
-    max-width: 600px;
+    max-width: 650px;
+    /* border: solid black; */
 }
 .infoBox{
-    /* text-align: center; */
-    margin: 0px 0px 20px 0px;
-    border: 2px solid black;
-    border-radius: 3px;
+    
+    color: rgb(255, 255, 255);
+    /* "MV boli" */
+    font-family: "Times New Roman";
+    background-color: rgb(124, 123, 123);
+    font-size: 2.2rem;
+    margin: 0px 0px 15px 0px;
+    border: 5px solid rgb(0, 0, 0);
+    border-radius: 5px;
 }
-
+.infoBoxLeadingText {
+    color: rgb(238, 196, 196);
+    display: inline;
+    font-family:'edo sz','adobe garamond',Verdana, arial;
+}
 .textBox{
     width: 50%;
     text-align: left;
