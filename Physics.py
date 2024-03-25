@@ -598,7 +598,6 @@ class Game:
         if not (all(isinstance(obj, (int, float)) for obj in (xvel, yvel)) and isinstance(table, Table) and table):
             return
         self.open_cursor()
-        print("shooting")
         game_ID = Game.current_cursor.execute("SELECT G.GAMEID FROM (Game AS G INNER JOIN Player AS P ON G.GAMEID = P.GAMEID)\
                                               WHERE G.GAMENAME = ? AND P.PLAYERNAME = ?", (gameName, playerName)).fetchone()
         self.game_ID = game_ID[0] if game_ID else None
@@ -634,7 +633,7 @@ class Game:
             list_of_segments.append(current_segment)
             table = current_segment
             if count >= 500:
-                print("TOO MANY SEGMENTS")
+                print(f"TOO MANY SEGMENTS (COUNTED {count}). ABORTING SHOOT")
                 return
         table_shot_values = [(table_ID, shot_ID) for table_ID in table_ID_list]
         self.most_recent_shot_ID = shot_ID

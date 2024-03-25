@@ -94,6 +94,8 @@ class ServerGame(Physics.Game):
         # print(self.game_ID, self.game_Name, self.player1_name, self.player2_name) # inherited from superclass
         self.most_recent_table : Physics.Table = make_default_table() # initially the game will have the default table
         self.current_player : str = self.player1_name if random() > 0.5 else self.player2_name
+        # the player who is NOT playing
+        self.other_player : str = self.player1_name if self.current_player == self.player2_name else self.player2_name
         self.num_shots_made : int = 0
         self.set_high_low : bool = False
         self.previous_shot_max_index : int = 0
@@ -105,6 +107,7 @@ class ServerGame(Physics.Game):
         self.eight_ball_sunk_invalid : bool = False
         self.eight_ball_sunk_valid : bool = False
         self.winner : str = None
+        self.sunk_balls : list[int] = []
         # exclude the 8 ball and the cue ball from both lists
         # use lists not a tuple because the lists will be shortened as the game progresses
         self.high_balls = [i for i in range(9, 16)]
@@ -114,9 +117,8 @@ class ServerGame(Physics.Game):
         return
     
     def switch_current_player(self) -> None:
-        x = self.current_player
-        self.current_player = self.player2_name if x == self.player1_name else self.player1_name
-        print(f"switched to player: {self.current_player} from {x}")
+        self.other_player = self.current_player
+        self.current_player = self.player2_name if self.current_player == self.player1_name else self.player1_name
         return
 
     def perform_shot(self, x_vel, y_vel) -> tuple[tuple[str]]:
@@ -151,6 +153,11 @@ class ServerGame(Physics.Game):
             self.most_recent_table += Physics.StillBall(0, Physics.Coordinate(Physics.TABLE_WIDTH / 2.0, Physics.TABLE_LENGTH - Physics.TABLE_WIDTH / 2.0))
         if not self.extra_turn:
             self.switch_current_player()
+        if self.eight_ball_sunk:
+            if self.eight_ball_sunk_invalid:
+                self.winner = self.other_player.split()[0]
+            elif self.eight_ball_sunk_valid:
+                self.winner = self.current_player.split()[0]
         return tuple(svg_list)
     
     def analyze_segments(self, segments : tuple[Physics.Table]) -> None:
@@ -177,24 +184,39 @@ class ServerGame(Physics.Game):
                         if previous_ball == 0:
                             self.cue_ball_sunk = True
                             continue
-                        # if the HIGH/LOW waas not yet set
+                        # if the HIGH/LOW was not yet set (can only happen once)
                         if self.set_high_low is False:
                             if previous_ball in self.low_balls:
-                                print(f"SETTING CURRENT PLAYER {self.current_player} LOW")
+                                print(f"SETTING CURRENT PLAYER {self.current_player} LOW -- ball {previous_ball} was sunk")
                                 self.set_high_low_values(" (LOW)")
                                 self.low_balls.remove(previous_ball)
                             else:
-                                print(f"SETTING CURRENT PLAYER {self.current_player} HIGH")
+                                print(f"SETTING CURRENT PLAYER {self.current_player} HIGH -- ball {previous_ball} was sunk")
                                 self.set_high_low_values(" (HIGH)")
                                 self.high_balls.remove(previous_ball)
+                            self.extra_turn = True
+                            self.sunk_balls.append(previous_ball)
                             continue
                         
                         else:
+                            print(self.current_player, previous_ball)
                             if (self.current_player.endswith(" (LOW)") and previous_ball in self.low_balls):
                                 self.low_balls.remove(previous_ball)
+                                print(f"LOW BALL {previous_ball} was sunk")
+                                self.increase_player_score()
+                                self.extra_turn = True
                             elif (self.current_player.endswith(" (HIGH)") and previous_ball in self.high_balls):
                                 self.high_balls.remove(previous_ball)
-                            self.increase_player_score()
+                                print(f"HIGH BALL {previous_ball} was sunk")
+                                self.increase_player_score()
+                                self.extra_turn = True
+                            elif (self.current_player.endswith(" (LOW)") and previous_ball in self.high_balls):
+                                self.high_balls.remove(previous_ball)
+                                self.increase_player_score(self.other_player)
+                            elif (self.current_player.endswith(" (HIGH)") and previous_ball in self.low_balls):
+                                self.low_balls.remove(previous_ball)
+                                self.increase_player_score(self.other_player)
+                            self.sunk_balls.append(previous_ball)
             previous_balls = segment_balls
                         
     def increase_player_score(self, player_to_increment_score : str = ''):
@@ -276,6 +298,38 @@ class ServerGame(Physics.Game):
         circle_spacing = rect_width / (num_low_balls + 1)
         # Add circles for high balls
         for i, ball_number in enumerate(self.low_balls):
+            cx = circle_spacing * (i + 1)
+            cy = rect_height / 2
+            # Add main colored circle for the ball itself
+            svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS}" fill="{Physics.BALL_COLOURS[ball_number]}" />'
+            # Add smaller white circle for ball number
+            svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS/2}" fill="white" />'
+            # Add text inside the white circle
+            svg_string += f'<text x="{cx}" y="{cy + 4}" text-anchor="middle" alignment-baseline="middle" fill="black" font-size="{Physics.BALL_RADIUS/2}px" font-weight="bold">{ball_number}</text>'
+            
+        svg_string += '</svg>'
+        return svg_string
+
+    def sunk_balls_svg(self) -> str:
+        # Define rectangle dimensions
+        rect_width = ServerGame.SVG_BALL_DISPLAY_X
+        rect_height = ServerGame.SVG_BALL_DISPLAY_Y
+        
+        # Start SVG string with rectangle
+        svg_string = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+                        <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+                        "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+                        <svg width="{rect_width}" height="{rect_height}"
+                        xmlns="http://www.w3.org/2000/svg"
+                        xmlns:xlink="http://www.w3.org/1999/xlink">"""
+        svg_string += f'<rect x="0" y="0" width="{rect_width}" height="{rect_height}" fill="none"/>'
+
+        # Calculate spacing for circles
+        num_high_balls = len(self.sunk_balls)
+        circle_spacing = rect_width / (num_high_balls + 1)
+        
+        # Add circles for high balls
+        for i, ball_number in enumerate(self.sunk_balls):
             cx = circle_spacing * (i + 1)
             cy = rect_height / 2
             # Add main colored circle for the ball itself
@@ -466,6 +520,43 @@ class MyHandler(BaseHTTPRequestHandler):
 
     def generate_display_html(self, current_game : ServerGame, game_name : str, player_one : str, player_two : str) -> None:
         current_table = current_game.most_recent_table
+        if current_game.winner:
+            response_content = f"""<!DOCTYPE html>
+                                <html lang="en">
+                                <head>
+                                    <meta charset="UTF-8">
+                                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                    <title>Game Over!</title>
+                                    <style>
+                                        body {{
+                                            font-family: Arial, sans-serif;
+                                            text-align: center;
+                                            background-color: #f0f0f0;
+                                        }}
+                                        .winner-container {{
+                                            margin-top: 100px;
+                                        }}
+                                        .winner-text {{
+                                            font-size: 24px;
+                                            color: #333;
+                                            font-weight: bold;
+                                            margin-bottom: 20px;
+                                        }}
+                                        .winner-name {{
+                                            color: #008000;
+                                            font-size: 32px;
+                                            font-weight: bold;
+                                        }}
+                                    </style>
+                                </head>
+                                <body>
+                                    <div class="winner-container">
+                                        <p class="winner-text">Winner:</p>
+                                        <p class="winner-name">{current_game.winner}</p>
+                                    </div>
+                                </body>
+                                </html>"""
+            return response_content
         response_content = f"""<!DOCTYPE html>
                             <html lang="en">
                             <head>
@@ -488,6 +579,7 @@ class MyHandler(BaseHTTPRequestHandler):
                                     {self.box("Current LOW balls:" + current_game.low_balls_svg())} <!--INSERT LOW BALLS SVG HERE-->
                                     {self.box("Current HIGH balls:" + current_game.high_balls_svg())} <!--INSERT HIGH BALLS SVG HERE-->
                                     {self.box("Current Game ID:" + str(current_game.game_ID))} <!--INSERT GAME ID HERE-->
+                                    {self.box("Sunk balls:" + current_game.sunk_balls_svg())} <!--INSERT SUNK BALLS SVG HERE-->
                                 </div> <!--for outer info box-->
                                 </div> <!---for column 1-->
                                 <div class="column">
