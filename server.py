@@ -133,15 +133,19 @@ class ServerGame(Physics.Game):
         num_tables = super().get_number_of_tables_for_shot() # this will go from 1 - num_tables
         previous_max_index = self.previous_shot_max_index
         svg_list = []
+        start = perf_counter()
         print(f"using i range: ({previous_max_index} - {num_tables + previous_max_index})")
+        self.open_cursor()
         for i in range(previous_max_index, previous_max_index + num_tables):
             table = self.database.readTable(i)
+            # write_svg(i, table)
             svg_list.append((table.svg(), table.time))
+        print(f"time to do all readings: {perf_counter() - start}")
         self.previous_shot_max_index += num_tables
         print(f"max shot changed from {self.previous_shot_max_index - num_tables} to {self.previous_shot_max_index}")
         
         self.most_recent_table = self.database.readTable(previous_max_index + num_tables - 1)
-        print(self.most_recent_table)
+        # print(self.most_recent_table)
         if self.cue_ball_sunk:
             #insert the cue ball at starting position. If there happens to be a ball there, things will break.
             self.most_recent_table += Physics.StillBall(0, Physics.Coordinate(Physics.TABLE_WIDTH / 2.0, Physics.TABLE_LENGTH - Physics.TABLE_WIDTH / 2.0))
@@ -439,24 +443,16 @@ class MyHandler(BaseHTTPRequestHandler):
             game = MyHandler.current_game
             list_of_svgs = game.perform_shot(xvel, yvel)
             # print("Number of SVGs:", str(len(list_of_svgs)))
-            json_content = [{"num_svgs": f'{len(list_of_svgs)}'}]
-            for i, (svg, time) in enumerate(list_of_svgs):
-                table_data = {
-                    f"table-{i}": svg,  # Remove leading/trailing whitespace from SVG
-                    f"table-{i}_time": time, 
-                }
-                json_content.append(table_data)
-            json_content.append({"cue_ball_sunk": MyHandler.current_game.cue_ball_sunk})
-            # json_content.append({"last_table": MyHandler.current_game.most_recent_table.svg()})
-            # json_content.append({"last_table_time": MyHandler.current_game.most_recent_table.time})
-            
-            # Convert the JSON object to a string
-            response_content = json.dumps(json_content)
+            text_response : str = ''
+            for (svg, time) in list_of_svgs:
+                text_response += svg + '\n\n'
+                text_response += str(time) + '\n\n'
+            text_response += "\n\n" + str(game.cue_ball_sunk)
             self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.send_header("Content-length", len(response_content))
+            self.send_header("Content-type", "text")
+            self.send_header("Content-length", len(text_response))
             self.end_headers()
-            self.wfile.write(bytes(response_content, "utf-8"))
+            self.wfile.write(bytes(text_response, "utf-8"))
         
         else:
             self.send_response(404)
@@ -491,6 +487,7 @@ class MyHandler(BaseHTTPRequestHandler):
                                     {self.box("Current Player: " + current_game.current_player)}<!--INSERT CURRENT PLAYER HERE-->
                                     {self.box("Current LOW balls:" + current_game.low_balls_svg())} <!--INSERT LOW BALLS SVG HERE-->
                                     {self.box("Current HIGH balls:" + current_game.high_balls_svg())} <!--INSERT HIGH BALLS SVG HERE-->
+                                    {self.box("Current Game ID:" + str(current_game.game_ID))} <!--INSERT GAME ID HERE-->
                                 </div> <!--for outer info box-->
                                 </div> <!---for column 1-->
                                 <div class="column">
@@ -513,6 +510,7 @@ def main() -> None:
     #     print("Need a command line argument!")
     #     # need to use exit instead of return
     #     sys.exit(1)  # Exit the script
+    
     temp = Physics.Database(reset=True)
     temp.close()
     del temp

@@ -10,7 +10,7 @@ let svgLayer = document.getElementById("svgLayer"); // hidden layer that goes ab
 const shotWidth  = '10'; // how big to make the shot line
 const SCALE_FACTOR = 10;
 const SIM_RATE = 0.01;
-const REFESH_TIME = 1 // in milliseconds
+const REFRESH_TIME = 10 // in milliseconds
 const INDICATOR_FONT_SIZE = '16px';
 const MAX_VEL = 4000.0; // max velocity of a shot
 
@@ -159,7 +159,7 @@ function getSVGFromMouse(event, SVGObject) {
 function svgRefreshFunction(tableData, timeData) {
     tableDisplay = document.getElementById("svgTableDisplay");
     tableDisplay.innerHTML = tableData;
-    document.getElementById("time").textContent = "Table time: " + timeData.toFixed(2);
+    document.getElementById("time").textContent = "Table time: " + Number(timeData).toFixed(2);
 }
 
 function sendShotData(shotData) {
@@ -171,7 +171,7 @@ function sendShotData(shotData) {
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status == 200) {
                     console.log('Shot data sent successfully');
-                    resolve(JSON.parse(xhr.responseText));
+                    resolve(xhr.responseText);
                 } else {
                     console.error('Network response was not ok');
                     reject(new Error('Network response was not ok'));
@@ -179,21 +179,24 @@ function sendShotData(shotData) {
             }
         };
         xhr.send(JSON.stringify(shotData));
-        console.log("sent req")
+        console.log("sent shot data")
     });
 }
 
 async function handleShotData(shotData) {
     try {
-        const JSONData = await sendShotData(shotData);
-        // console.log(JSONData);
-        let num_svgs = Number(JSONData[0].num_svgs)
-        console.log("number of svgs: " + num_svgs, typeof(num_svgs));
-        for (let i = 1; i < num_svgs; i++) {
-            svgRefreshFunction(JSONData[i][`table-${i - 1}`], JSONData[i][`table-${i - 1}_time`]);
-            await new Promise(resolve => setTimeout(resolve, REFESH_TIME));
+        const TextData = await sendShotData(shotData);
+        var svgData = TextData.split('\n\n'); // Split by double newline characters
+        console.log(svgData.length)
+        
+        for (let i = 0; i < svgData.length - 2; i += 2) {
+            // if (!svgData[i].trim() || !svgData[i + 1].trim()) {
+            //     console.log("Data at index " + i + " or " + (i + 1) + " is invalid");
+            // }
+            svgRefreshFunction(svgData[i].trim(), svgData[i+1].trim());
+            await new Promise(resolve => setTimeout(resolve, REFRESH_TIME));
         }
-        if (JSONData[num_svgs + 1].cue_ball_sunk) {
+        if (svgData[svgData.length-1] == "True") {
             console.log("CUE BALL WAS SUNK!");
             window.alert(`The Cue ball was sunk. Reverting cue ball position to initial spot.\n`);
         }
@@ -271,7 +274,7 @@ function refreshPage() {
                 event.preventDefault(); // prevent right click on table
             });
             svgLayer = document.getElementById("svgLayer"); // hidden layer that goes above the pool table 
-            console.log(cueBall, table, svgLayer);
+            // console.log(cueBall, table, svgLayer);
             attatchEventListenersToCueBall();
         }
     };

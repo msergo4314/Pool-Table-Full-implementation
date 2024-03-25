@@ -390,7 +390,7 @@ class Database:
     def readTable(self, tableID):
         if not isinstance(tableID, int):
             return None
-        self.open_cursor()
+        # self.open_cursor()
         balls_in_table = Database.current_cursor.execute(f"""SELECT b.BALLNO, b.XPOS, b.YPOS, b.XVEL, b.YVEL, t.TIME
                 FROM Ball AS b JOIN BallTable AS bt
                 ON b.BALLID = bt.BALLID JOIN TTable AS t
@@ -408,8 +408,8 @@ class Database:
                 new_ball = RollingBall(current_ball[0], Coordinate(current_ball[1], current_ball[2]), Coordinate(current_ball[3], current_ball[4]),\
                 get_acceleration_coordinates(current_ball[3], current_ball[4]))
             table_to_return += new_ball
-        Database.current_database_connection.commit()
-        self.close_cursor()
+        # Database.current_database_connection.commit() # commits are too slow and also this function does not change the actual db
+        # self.close_cursor()
         return table_to_return
 
     def writeTable(self, table) -> int:
@@ -440,14 +440,14 @@ class Database:
         return table_ID - 1 # adjust for offset of 1
 
     def add_shot(self, player_name, game_ID) -> Union[int, None]:
-        self.open_cursor()
+        # self.open_cursor()
         player_ID = Database.current_cursor.execute("SELECT PLAYERID FROM Player WHERE Player.PLAYERNAME = ? AND Player.GAMEID = ?", (player_name, game_ID)).fetchone()
         player_ID = player_ID[0] if player_ID else None
         if player_ID is not None:
             Database.current_cursor.execute("INSERT INTO Shot (PLAYERID, GAMEID) SELECT ?, ?;", (player_ID, game_ID))
             shot_ID = Database.current_cursor.execute("SELECT MAX(SHOTID) FROM Shot WHERE Shot.GAMEID = ? AND Shot.PLAYERID = ?", (game_ID, player_ID)).fetchone()[0]
             # Database.current_database_connection.commit()
-            self.close_cursor()
+            # self.close_cursor()
             return shot_ID
         return None
 
@@ -614,7 +614,7 @@ class Game:
         from math import floor
         list_of_segments : list[Table] = []
         table_ID_list : list[int] = []
-        self.open_cursor()
+        # self.open_cursor()
         count = 0
         from time import perf_counter
         start = perf_counter()
@@ -623,7 +623,7 @@ class Game:
             if (current_segment := table.segment()) is None:
                 break
             num_iterations = floor((current_segment.time - table.time) / FRAME_INTERVAL)
-            print(f"segment {count} has {num_iterations} svgs")
+            # print(f"segment {count} has {num_iterations} svgs")
             for i in range(num_iterations):
                 roll_time : int = i * FRAME_INTERVAL
                 table_inner : Table = table.roll(roll_time)
