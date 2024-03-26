@@ -428,6 +428,7 @@ class Database:
             if current_ball[3] is None and current_ball[4] is None:
                 new_ball = StillBall(current_ball[0], Coordinate(current_ball[1], current_ball[2]))
             else:
+                # new_ball = StillBall(current_ball[0], Coordinate(current_ball[1], current_ball[2]))
                 new_ball = RollingBall(current_ball[0], Coordinate(current_ball[1], current_ball[2]), Coordinate(current_ball[3], current_ball[4]),\
                 get_acceleration_coordinates(current_ball[3], current_ball[4]))
             table_to_return += new_ball
@@ -720,10 +721,9 @@ class Game:
 ################################################################################    
 def get_acceleration_coordinates(rolling_ball_dx: float, rolling_ball_dy: float) -> Union[Coordinate, None]:
         from math import hypot
+        rolling_ball_a_x, rolling_ball_a_y = 0.0, 0.0
         rolling_ball_speed = hypot(rolling_ball_dx, rolling_ball_dy)
-        if rolling_ball_speed == 0.0:
-            return None
         if (rolling_ball_speed > VEL_EPSILON):
             rolling_ball_a_x = -rolling_ball_dx * DRAG / rolling_ball_speed
             rolling_ball_a_y = -rolling_ball_dy * DRAG / rolling_ball_speed
-            return Coordinate(rolling_ball_a_x, rolling_ball_a_y)
+        return Coordinate(rolling_ball_a_x, rolling_ball_a_y)
