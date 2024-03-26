@@ -1,7 +1,8 @@
 # A4 CIS*2750
 # Martin Sergo W24 
-import os, Physics, sys, json # sys used to get argv, os for file operations, Physics for phylib library access, json for post request data
+import os, Physics, json # sys used to get argv, os for file operations, Physics for phylib library access, json for post request data
 from typing import Union
+# from sys import exit
 from subprocess import run, CalledProcessError, DEVNULL
 from time import perf_counter
 
@@ -126,13 +127,15 @@ class ServerGame(Physics.Game):
         self.cue_ball_sunk = False
         self.extra_turn = False
         # perform the shot. Split the current player for when (LOW) or (HIGH) are appended (will not be in db)
-        segments : tuple[Physics.Table] = super().shoot(gameName=self.game_Name, playerName=self.current_player.split(maxsplit=1)[0], table=self.most_recent_table, xvel=x_vel, yvel=y_vel)
-        self.analyze_segments(segments)
+        playerName = self.remove_high_low_if_present()
+        segments : tuple[Physics.Table] = super().shoot(gameName=self.game_Name, playerName=playerName,\
+            table=self.most_recent_table, xvel=float(x_vel), yvel=float(y_vel))
+        self.analyze_segments(segments) # update scores or end game as needed
         if self.cue_ball_sunk:
             print("CUE BALL HAS BEEN SUNK")
-        print(f"number of segments: {len(segments)}")
+        print(f"total number of segments: {len(segments)}")
         # self.database.database_to_file()
-        num_tables = super().get_number_of_tables_for_shot() # this will go from 1 - num_tables
+        num_tables = super().get_number_of_tables_for_shot(self.most_recent_shot_ID) # this will go from 1 - num_tables
         previous_max_index = self.previous_shot_max_index
         svg_list = []
         start = perf_counter()
@@ -151,12 +154,7 @@ class ServerGame(Physics.Game):
         if self.cue_ball_sunk:
             #insert the cue ball at starting position. If there happens to be a ball there, things will break.
             self.most_recent_table += Physics.StillBall(0, Physics.Coordinate(Physics.TABLE_WIDTH / 2.0, Physics.TABLE_LENGTH - Physics.TABLE_WIDTH / 2.0))
-        if self.eight_ball_sunk:
-            if self.eight_ball_sunk_invalid:
-                self.winner = self.other_player.split()[0]
-            elif self.eight_ball_sunk_valid:
-                self.winner = self.current_player.split()[0]
-        if not self.extra_turn or self.cue_ball_sunk:
+        if not self.extra_turn and not self.winner:
             self.switch_current_player()
         return tuple(svg_list)
     
@@ -174,11 +172,11 @@ class ServerGame(Physics.Game):
                             self.eight_ball_sunk = True
                             if len(previous_balls) == 2:
                                 # case for only cue ball and 8 ball
-                                self.eight_ball_sunk_valid = True
+                                self.winner = self.remove_high_low_if_present()
                                 print("VALID 8 BALL SUNK")
                             else:
                                 # should immediately end the game and make current player the loser
-                                self.eight_ball_sunk_invalid = True
+                                self.winner = self.remove_high_low_if_present(player=self.other_player)
                                 print("INVALID 8 BALL SUNK")
                             return
                         if previous_ball == 0:
@@ -212,9 +210,11 @@ class ServerGame(Physics.Game):
                                 self.extra_turn = True
                             elif (self.current_player.endswith(" (LOW)") and previous_ball in self.high_balls):
                                 self.high_balls.remove(previous_ball)
+                                print(f"HIGH BALL {previous_ball} was sunk")
                                 self.increase_player_score(self.other_player)
                             elif (self.current_player.endswith(" (HIGH)") and previous_ball in self.low_balls):
                                 self.low_balls.remove(previous_ball)
+                                print(f"LOW BALL {previous_ball} was sunk")
                                 self.increase_player_score(self.other_player)
                             self.sunk_balls.append(previous_ball)
             previous_balls = segment_balls
@@ -342,6 +342,19 @@ class ServerGame(Physics.Game):
         svg_string += '</svg>'
         return svg_string
 
+    def remove_high_low_if_present(self, player : str = "") -> str:
+        if not player:
+            player: str = self.current_player
+        low_index = player.find(" (LOW)")
+        high_index = player.find(" (HIGH)")
+
+        if low_index != -1 or high_index != -1:
+            if low_index != -1:
+                return player[:low_index]
+            else:
+                return player[:high_index]
+        return player
+
 #################################################################################
 class MyHandler(BaseHTTPRequestHandler):
     current_game : ServerGame = None
@@ -353,7 +366,7 @@ class MyHandler(BaseHTTPRequestHandler):
         # parse the URL to get the path and form data
         path = urlparse(self.path).path[1:]
 
-        if not path and os.path.exists("index.html"):
+        if (not path or path == "index.html") and os.path.exists("index.html"):
             self.send_response(200)
             self.send_header("Content-type", "text/html")
             
@@ -423,7 +436,6 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.wfile.write(bytes(response_content, "utf-8"))
         
         elif path == "display_game":
-            print("game display")
             if MyHandler.current_game is None:
                 response_content = "<h1>NO GAME FOUND</h1>"
                 self.send_response(200)
@@ -442,6 +454,8 @@ class MyHandler(BaseHTTPRequestHandler):
             self.send_header("Content-length", len(response_content))
             self.end_headers()
             self.wfile.write(bytes(response_content, "utf-8"))
+            if MyHandler.current_game.winner:
+                print(f"GAME OVER. WINNER: {MyHandler.current_game.winner}")
         
         else:
             self.send_response(404)
@@ -521,7 +535,7 @@ class MyHandler(BaseHTTPRequestHandler):
     def generate_display_html(self, current_game : ServerGame, game_name : str, player_one : str, player_two : str) -> str:
         current_table = current_game.most_recent_table
         if current_game.winner:
-            return self.generate_winner_display_html(current_game.winner)
+            return self.generate_winner_display_html(current_game)
         # {self.box("Current Game ID:" + str(current_game.game_ID))} <!--INSERT GAME ID HERE-->
         
         response_content = f"""<!DOCTYPE html>
@@ -549,6 +563,7 @@ class MyHandler(BaseHTTPRequestHandler):
                                 </div> <!--for outer info box-->
                                 </div> <!---for column 1-->
                                 <div class="column">
+                                {self.generate_shot_label()}
                                 <div id="svgTableDisplay">
                                     {current_table.svg()}<!--INSERT TABLE HERE-->
                                     <svg id="svgLayer"></svg>
@@ -560,42 +575,35 @@ class MyHandler(BaseHTTPRequestHandler):
                             </html>"""
         return response_content
 
-    def generate_winner_display_html(winner : str):
+    def generate_shot_label(self):
+        str = f"""<div class="shotSpeedLabel">SHOT VELOCITY: (NONE)</div>"""
+        return str
+
+    def generate_winner_display_html(self, winTable : ServerGame):
         response_content = f"""<!DOCTYPE html>
                                 <html lang="en">
                                 <head>
                                     <meta charset="UTF-8">
                                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
                                     <title>Game Over!</title>
-                                    <style>
-                                        body {{
-                                            font-family: Arial, sans-serif;
-                                            text-align: center;
-                                            background-color: #f0f0f0;
-                                        }}
-                                        .winner-container {{
-                                            margin-top: 100px;
-                                        }}
-                                        .winner-text {{
-                                            font-size: 24px;
-                                            color: #333;
-                                            font-weight: bold;
-                                            margin-bottom: 20px;
-                                        }}
-                                        .winner-name {{
-                                            color: #008000;
-                                            font-size: 32px;
-                                            font-weight: bold;
-                                        }}
-                                    </style>
+                                    <link rel = "stylesheet" href="style.css">
                                 </head>
                                 <body>
                                     <div class="winner-container">
-                                        <p class="winner-text">Winner:</p>
-                                        <p class="winner-name">{winner}</p>
+                                        <p class="winner-text">Winner: {winTable.winner}</p>
+                                        <p>Player one score: {winTable.player_1_score}</p>
+                                        <p>Player two score: {winTable.player_2_score}</p>
+                                        <p>Game won in {winTable.num_shots_made} shots</p>
+                                        <a href="/">
+                                            <button>PLAY AGAIN</button>
+                                        </a>
                                     </div>
                                 </body>
                                 </html>"""
+        winTable.database.close()
+        temp = Physics.Database(reset=True)
+        temp.close()
+        del temp
         return response_content
     
     def box(self, string: str = None, ID : str = "") -> str:

@@ -60,18 +60,38 @@
     {
       case PHYLIB_STILL_BALL:
         new = phylib_new_still_ball( num, pos );
+        if (!new) {
+          PyErr_SetString( PyExc_ValueError, "malloc error making still ball" );
+          return NULL;
+        }
         break;
       case PHYLIB_ROLLING_BALL:
         new = phylib_new_rolling_ball( num, pos, vel, acc );
+        if (!new) {
+          PyErr_SetString( PyExc_ValueError, "malloc error making rolling ball" );
+          return NULL;
+        }
         break;
       case PHYLIB_HOLE:
         new = phylib_new_hole( pos );
+        if (!new) {
+          PyErr_SetString( PyExc_ValueError, "malloc error making hole" );
+          return NULL;
+        }
         break;
       case PHYLIB_HCUSHION:
         new = phylib_new_hcushion( y );
+        if (!new) {
+          PyErr_SetString( PyExc_ValueError, "malloc error making Hcushion" );
+          return NULL;
+        }
         break;
       case PHYLIB_VCUSHION:
         new = phylib_new_vcushion( x );
+        if (!new) {
+          PyErr_SetString( PyExc_ValueError, "malloc error making Vcushion" );
+          return NULL;
+        }
         break;
       default:
         PyErr_SetString( PyExc_ValueError, "bad type" );
@@ -84,7 +104,6 @@
       return NULL;
     }
     return new;
-
   }
 
   /* __str__ method */
@@ -122,7 +141,7 @@
     phylib_table *ptr = phylib_copy_table( $self );
     if (!ptr)
     {
-      PyErr_SetString( PyExc_ValueError, "malloc error" );
+      PyErr_SetString( PyExc_ValueError, "malloc error in copy" );
       return NULL;
     }
     return ptr;
