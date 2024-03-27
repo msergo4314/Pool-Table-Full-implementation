@@ -142,26 +142,22 @@ phylib_table *phylib_new_table(void) {
 }
 
 void phylib_copy_object(phylib_object **dest, phylib_object **src) {
-    phylib_object *location = (phylib_object*)malloc(sizeof(phylib_object));
-    if(location == NULL) {
-        // printf("malloc failed\n");
-        return;
-    }
     // printf("malloced space at %p for copied object\n", (void*)location);
     if (src == NULL || dest == NULL) {
-        // printf("freeing %p\n", (void*)location);
-        free(location);
         return;
     }
     if (*src == NULL) {
         // printf("*src is NULL\n");
-        free(location);
         *dest = NULL; // set destination to source which is NULL
         return;
     }
     // even if *src == NULL, memcpy will work
     // printf("attempting to copy object type %d\n", (*src)->type);
-    *dest = location;
+    *dest = (phylib_object*)malloc(sizeof(phylib_object));
+    if(*dest == NULL) {
+        // printf("malloc failed\n");
+        return;
+    }
     memcpy(*dest, *src, sizeof(phylib_object));
     return;
 }
@@ -171,7 +167,7 @@ phylib_table *phylib_copy_table(phylib_table *table) {
         return NULL;
     }
     // use phylib_new_table since it also does the holes/cushions
-    phylib_table *new_table = malloc(sizeof(phylib_table));
+    phylib_table *new_table = (phylib_table *)malloc(sizeof(phylib_table));
     if (new_table == NULL) {
         // printf("Error with malloc for copy table\n");
         return NULL;
@@ -230,7 +226,7 @@ double phylib_length(phylib_coord c) {
 }
 
 double phylib_dot_product(phylib_coord b, phylib_coord a) {
-    return a.x*b.x + a.y*b.y;
+    return a.x * b.x + a.y * b.y;
 }
 
 double phylib_distance(phylib_object *obj1, phylib_object *obj2) {
@@ -327,51 +323,53 @@ void phylib_bounce(phylib_object **a, phylib_object **b) {
         printf("Cannot bounce NULL objects!\n");
         return;
     }
-    if (*a == NULL || *b == NULL) {
+    phylib_object *a_ptr = (phylib_object *)(*a), *b_ptr = (phylib_object *)(*b);
+
+    if (a_ptr == NULL || b_ptr == NULL) {
         return;
     }
-    if ((*a)->type != PHYLIB_ROLLING_BALL) {
+    if (a_ptr->type != PHYLIB_ROLLING_BALL) {
         printf("The first object must be a rolling ball!\n");
         return;
     }
-    switch((*b)->type) {
+    switch(b_ptr->type) {
         case PHYLIB_HCUSHION:
             // velocity and acceleration are reversed for y
-            (*a)->obj.rolling_ball.vel.y *= -1;
-            (*a)->obj.rolling_ball.acc.y *= -1;
+            a_ptr->obj.rolling_ball.vel.y *= -1;
+            a_ptr->obj.rolling_ball.acc.y *= -1;
             break;
         case PHYLIB_VCUSHION:
             // velocity and acceleration are reversed for x
-            (*a)->obj.rolling_ball.vel.x *= -1;
-            (*a)->obj.rolling_ball.acc.x *= -1;
+            a_ptr->obj.rolling_ball.vel.x *= -1;
+            a_ptr->obj.rolling_ball.acc.x *= -1;
             break;
         case PHYLIB_HOLE:
             // free the memory of b, then set a to null;
             // printf("freeing ball %p since hole collision\n", (void*)*a);
-            free(*a);
+            free(a_ptr);
             *a = NULL; // works because of double pointer otherwise this would be local
             break;
         case PHYLIB_STILL_BALL: ;
-            unsigned char number = (*b)->obj.still_ball.number;
-            double pos_x = (*b)->obj.still_ball.pos.x;
-            double pos_y = (*b)->obj.still_ball.pos.y;
-            (*b)->type = PHYLIB_ROLLING_BALL;
-            (*b)->obj.rolling_ball.number = number;
+            unsigned char number = b_ptr->obj.still_ball.number;
+            double pos_x = b_ptr->obj.still_ball.pos.x;
+            double pos_y = b_ptr->obj.still_ball.pos.y;
+            b_ptr->type = PHYLIB_ROLLING_BALL;
+            b_ptr->obj.rolling_ball.number = number;
             // printf("still ball becomes moving ball\n");
-            (*b)->obj.rolling_ball.pos.x = pos_x;
-            (*b)->obj.rolling_ball.pos.y = pos_y;
-            (*b)->obj.rolling_ball.vel.x = 0.0;
-            (*b)->obj.rolling_ball.vel.y = 0.0;
-            (*b)->obj.rolling_ball.acc.x = 0.0;
-            (*b)->obj.rolling_ball.acc.y = 0.0;
+            b_ptr->obj.rolling_ball.pos.x = pos_x;
+            b_ptr->obj.rolling_ball.pos.y = pos_y;
+            b_ptr->obj.rolling_ball.vel.x = 0.0;
+            b_ptr->obj.rolling_ball.vel.y = 0.0;
+            b_ptr->obj.rolling_ball.acc.x = 0.0;
+            b_ptr->obj.rolling_ball.acc.y = 0.0;
             // go to case 5 (rolling ball, since still ball is now a rolling ball)
         case PHYLIB_ROLLING_BALL: ;
             // printf("Two rolling balls collide\n");
             // difference between a and b for position and velocity (a - b)
-            phylib_coord r_ab = phylib_sub((*a)->obj.rolling_ball.pos, (*b)->obj.rolling_ball.pos);
+            phylib_coord r_ab = phylib_sub(a_ptr->obj.rolling_ball.pos, b_ptr->obj.rolling_ball.pos);
 
             // relative velocity of a with respect to b
-            phylib_coord v_rel = phylib_sub((*a)->obj.rolling_ball.vel, (*b)->obj.rolling_ball.vel);
+            phylib_coord v_rel = phylib_sub(a_ptr->obj.rolling_ball.vel, b_ptr->obj.rolling_ball.vel);
 
             phylib_coord n; // make a unit vector n
             n.x = 0.0; // these should get replaced
@@ -384,24 +382,24 @@ void phylib_bounce(phylib_object **a, phylib_object **b) {
             // v_rel is relative velocity in the direction of a
             double v_rel_n = phylib_dot_product(n, v_rel);
             // velocity of ball a is decreased by v_rel_n * n.(x || y)
-            (*a)->obj.rolling_ball.vel.x -= (v_rel_n * n.x);
-            (*a)->obj.rolling_ball.vel.y -= (v_rel_n * n.y);
+            a_ptr->obj.rolling_ball.vel.x -= (v_rel_n * n.x);
+            a_ptr->obj.rolling_ball.vel.y -= (v_rel_n * n.y);
 
             // velocity of ball b is given by initial plus v_rel_n * n(x || y)
-            (*b)->obj.rolling_ball.vel.x += (v_rel_n * n.x);
-            (*b)->obj.rolling_ball.vel.y += (v_rel_n * n.y);
+            b_ptr->obj.rolling_ball.vel.x += (v_rel_n * n.x);
+            b_ptr->obj.rolling_ball.vel.y += (v_rel_n * n.y);
             
-            double speed_a = phylib_length((*a)->obj.rolling_ball.vel);
+            double speed_a = phylib_length(a_ptr->obj.rolling_ball.vel);
             if (speed_a > PHYLIB_VEL_EPSILON) {
                 // set acceleration to negative velocity divided by speed multiplied by drag
-                (*a)->obj.rolling_ball.acc.x = (-(*a)->obj.rolling_ball.vel.x * (PHYLIB_DRAG)) / speed_a;
-                (*a)->obj.rolling_ball.acc.y = (-(*a)->obj.rolling_ball.vel.y * (PHYLIB_DRAG)) / speed_a;
+                a_ptr->obj.rolling_ball.acc.x = (-a_ptr->obj.rolling_ball.vel.x * (PHYLIB_DRAG)) / speed_a;
+                a_ptr->obj.rolling_ball.acc.y = (-a_ptr->obj.rolling_ball.vel.y * (PHYLIB_DRAG)) / speed_a;
             }
-            double speed_b = phylib_length((*b)->obj.rolling_ball.vel);
+            double speed_b = phylib_length(b_ptr->obj.rolling_ball.vel);
             if (speed_b > PHYLIB_VEL_EPSILON) {
                 // set acceleration to negative velocity divided by speed multiplied by drag
-                (*b)->obj.rolling_ball.acc.x = (-(*b)->obj.rolling_ball.vel.x * (PHYLIB_DRAG)) / speed_b;
-                (*b)->obj.rolling_ball.acc.y = (-(*b)->obj.rolling_ball.vel.y * (PHYLIB_DRAG)) / speed_b;
+                b_ptr->obj.rolling_ball.acc.x = (-b_ptr->obj.rolling_ball.vel.x * (PHYLIB_DRAG)) / speed_b;
+                b_ptr->obj.rolling_ball.acc.y = (-b_ptr->obj.rolling_ball.vel.y * (PHYLIB_DRAG)) / speed_b;
             }
             break;
         default: ;

@@ -2,6 +2,7 @@
 # Martin Sergo W24 
 import os, Physics, json # sys used to get argv, os for file operations, Physics for phylib library access, json for post request data
 from typing import Union
+import sys
 # from sys import exit
 from subprocess import run, CalledProcessError, DEVNULL
 from time import perf_counter
@@ -51,6 +52,32 @@ def make_default_table() -> Physics.Table:
     table_to_return += sb
     return table_to_return
 
+def get_style_text(score : int) -> str:
+    style : str
+    colour : str = "#f2d305"
+    if score == 0:
+        style = "D"
+        colour = "#b8cee0"
+    elif score == 1:
+        style = "C"
+        colour = "#aecfeb"
+    elif score == 2:
+        style = "B"
+        colour = "#479ade"
+    elif score == 3:
+        style = "A"
+        colour = "#0875cf"
+    elif score == 4:
+        style = "S"
+    elif score == 5:
+        style = "S"
+    elif score == 6:
+        style = "SS"
+    else:
+        style = "SSS"
+    return f'<div style="font-family: \'DMC5Font\'; font-size: 3rem; color: {colour}; \
+    display: inline; -webkit-text-stroke: 1.5px black; text-stroke: 1.5px black;">&nbsp;&nbsp;&nbsp;&nbsp;{style}</div>'
+
 def remove_svgs(dir_name: str = "tables"):
     path = f"{os.getcwd()}{f'/{dir_name}/'}"
     list_of_files = os.listdir(path)
@@ -89,7 +116,7 @@ class ServerGame(Physics.Game):
     SVG_BALL_DISPLAY_X : int = 500
     SVG_BALL_DISPLAY_Y : int = 70
     
-    def __init__(self, gameName: str=None, player_one: str = None, player_two: str = None):
+    def __init__(self, gameName: str=None, player_one: str = None, player_two: str = None, game_ID : int = None):
         from random import random
         super().__init__(gameName=gameName, player1Name=player_one, player2Name=player_two) # call Game class constructor
         # print(self.game_ID, self.game_Name, self.player1_name, self.player2_name) # inherited from superclass
@@ -99,9 +126,9 @@ class ServerGame(Physics.Game):
         self.other_player : str = self.player1_name if self.current_player == self.player2_name else self.player2_name
         self.num_shots_made : int = 0
         self.set_high_low : bool = False
-        self.previous_shot_max_index : int = 0
         self.player_1_score : int = 0
         self.player_2_score : int = 0
+        self.most_recent_shot_ID = None
         self.cue_ball_sunk : bool = False
         self.cue_ball_sunk : bool = False
         self.eight_ball_sunk : bool = False
@@ -109,6 +136,8 @@ class ServerGame(Physics.Game):
         self.eight_ball_sunk_valid : bool = False
         self.winner : str = None
         self.sunk_balls : list[int] = []
+        self.starting_table_ID : int = self.get_total_number_of_tables_in_database()
+        print(self.starting_table_ID)
         # exclude the 8 ball and the cue ball from both lists
         # use lists not a tuple because the lists will be shortened as the game progresses
         self.high_balls = [i for i in range(9, 16)]
@@ -128,28 +157,30 @@ class ServerGame(Physics.Game):
         self.extra_turn = False
         # perform the shot. Split the current player for when (LOW) or (HIGH) are appended (will not be in db)
         playerName = self.remove_high_low_if_present()
+        print(self.game_ID)
         segments : tuple[Physics.Table] = super().shoot(gameName=self.game_Name, playerName=playerName,\
             table=self.most_recent_table, xvel=float(x_vel), yvel=float(y_vel))
         self.analyze_segments(segments) # update scores or end game as needed
         if self.cue_ball_sunk:
             print("CUE BALL HAS BEEN SUNK")
-        print(f"total number of segments: {len(segments)}")
-        # self.database.database_to_file()
-        num_tables = super().get_number_of_tables_for_shot(self.most_recent_shot_ID) # this will go from 1 - num_tables
-        previous_max_index = self.previous_shot_max_index
+        # num_tables = super().get_number_of_tables_for_shot(start + 1) # this will go from 1 - num_tables
+        largest_table_ID = self.get_last_tableID_for_shot(self.get_most_recent_shotID())
+        print(f"previous max shot index: {self.starting_table_ID}")
         svg_list = []
         start = perf_counter()
-        print(f"using i range: ({previous_max_index} - {num_tables + previous_max_index})")
+        print(f"using i range: ({self.starting_table_ID} - {largest_table_ID})")
         self.open_cursor()
-        for i in range(previous_max_index, previous_max_index + num_tables):
+        for i in range(self.starting_table_ID, largest_table_ID):
             table = self.database.readTable(i)
             # write_svg(i, table)
+            if table == None:
+                print(f"TABLE WITH TABLEID of {i} IS NONE")
             svg_list.append((table.svg(), table.time))
         print(f"time to do all readings: {perf_counter() - start}")
-        self.previous_shot_max_index += num_tables
-        print(f"max shot changed from {self.previous_shot_max_index - num_tables} to {self.previous_shot_max_index}")
-        
-        self.most_recent_table = self.database.readTable(previous_max_index + num_tables - 1)
+        self.starting_table_ID = self.get_last_tableID_for_shot(self.get_most_recent_shotID())
+        print(f"max shot changed to {self.starting_table_ID}")
+        self.open_cursor()
+        self.most_recent_table = self.database.readTable(self.starting_table_ID-1)
         # print(self.most_recent_table)
         if self.cue_ball_sunk:
             #insert the cue ball at starting position. If there happens to be a ball there, things will break.
@@ -359,8 +390,12 @@ class ServerGame(Physics.Game):
 class MyHandler(BaseHTTPRequestHandler):
     current_game : ServerGame = None
     
-    # def log_message(self, format, *args):
-    #     return
+    def log_message(self, format, *args):
+        # supress some requests
+        if self.path == "/single_svg":
+            return
+        # Log the message as usual for other paths
+        super().log_message(format, *args)
     
     def do_GET(self):
         # parse the URL to get the path and form data
@@ -457,6 +492,18 @@ class MyHandler(BaseHTTPRequestHandler):
             if MyHandler.current_game.winner:
                 print(f"GAME OVER. WINNER: {MyHandler.current_game.winner}")
         
+        elif path.startswith("images/") and os.path.exists("images/"):
+            path = path.strip("images/")
+            if path.endswith(".bmp"):
+                if os.path.exists(f"{'images/'}{path}"):
+                    self.send_response(200)
+                    self.send_header("Content-type", "image/bmp")
+                    with open(f"{'images/'}{path}", 'rb') as file:
+                        content = file.read()
+                    self.send_header("Content-length", len(content))
+                    self.end_headers()
+                    self.wfile.write(content)
+        
         else:
             self.send_response(404)
             self.send_header("Content-type", "text/html")
@@ -517,7 +564,7 @@ class MyHandler(BaseHTTPRequestHandler):
                 text_response += str(time) + '\n\n'
             text_response += "\n\n" + str(game.cue_ball_sunk)
             self.send_response(200)
-            self.send_header("Content-type", "text")
+            self.send_header("Content-type", "text/plain")
             self.send_header("Content-length", len(text_response))
             self.end_headers()
             self.wfile.write(bytes(text_response, "utf-8"))
@@ -538,11 +585,18 @@ class MyHandler(BaseHTTPRequestHandler):
             return self.generate_winner_display_html(current_game)
         # {self.box("Current Game ID:" + str(current_game.game_ID))} <!--INSERT GAME ID HERE-->
         
+        score_1 = current_game.player_1_score
+        score_2 = current_game.player_2_score
+        
+        score_1_style_text = get_style_text(score_1)
+        score_2_style_text = get_style_text(score_2)
+        
         response_content = f"""<!DOCTYPE html>
                             <html lang="en">
                             <head>
                                 <meta charset="UTF-8">
                                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                <link rel="icon" type="image/bmp" href="images/10_ball.bmp">
                                 <title>Make a shot!</title>
                                 <link rel="stylesheet" href="style.css">
                             </head>
@@ -554,16 +608,16 @@ class MyHandler(BaseHTTPRequestHandler):
                                     {self.box('<div class="infoBoxLeadingText">Player One: </div>' + player_one)}
                                     {self.box('<div class="infoBoxLeadingText">Player Two: </div>' + player_two)}
                                     {self.box('<div class="infoBoxLeadingText">Table time: </div>' + str(round(current_table.time, 2)), ID="time")}
-                                    {self.box('<div class="infoBoxLeadingText">Player one score: </div>' + str(current_game.player_1_score), ID="p1score")}
-                                    {self.box('<div class="infoBoxLeadingText">Player two score: </div>' + str(current_game.player_2_score), ID="p2score")}
+                                    {self.box(f'<div class="infoBoxLeadingText">Player one score: </div>{str(score_1)} {get_style_text(score_1)}', ID="p1score")}
+                                    {self.box(f'<div class="infoBoxLeadingText">Player one score: </div>{str(score_2)} {get_style_text(score_2)}', ID="p2score")}
                                     {self.box('<div class="infoBoxLeadingText">Current Player: </div>' + current_game.current_player)}
+                                    {self.box('<div class="infoBoxLeadingText">Current Shot Speed: </div>N/A', ID="speedBox")}
                                     {self.box('<div class="infoBoxLeadingText">Current LOW balls: </div>' + current_game.low_balls_svg())}
                                     {self.box('<div class="infoBoxLeadingText">Current HIGH balls: </div>' + current_game.high_balls_svg())}
                                     {self.box('<div class="infoBoxLeadingText">Sunk balls: </div>' + current_game.sunk_balls_svg())}
                                 </div> <!--for outer info box-->
                                 </div> <!---for column 1-->
                                 <div class="column">
-                                {self.generate_shot_label()}
                                 <div id="svgTableDisplay">
                                     {current_table.svg()}<!--INSERT TABLE HERE-->
                                     <svg id="svgLayer"></svg>
@@ -574,10 +628,6 @@ class MyHandler(BaseHTTPRequestHandler):
                             </body>
                             </html>"""
         return response_content
-
-    def generate_shot_label(self):
-        str = f"""<div class="shotSpeedLabel">SHOT VELOCITY: (NONE)</div>"""
-        return str
 
     def generate_winner_display_html(self, winTable : ServerGame):
         response_content = f"""<!DOCTYPE html>
@@ -601,9 +651,6 @@ class MyHandler(BaseHTTPRequestHandler):
                                 </body>
                                 </html>"""
         winTable.database.close()
-        temp = Physics.Database(reset=True)
-        temp.close()
-        del temp
         return response_content
     
     def box(self, string: str = None, ID : str = "") -> str:
@@ -615,9 +662,10 @@ def main() -> None:
     #     # need to use exit instead of return
     #     sys.exit(1)  # Exit the script
     
-    temp = Physics.Database(reset=True)
-    temp.close()
-    del temp
+    if "reset" in sys.argv:
+        temp = Physics.Database(reset=True)
+        temp.close()
+        del temp
     from subprocess import DEVNULL
     remove_video()
     # port_num = int(sys.argv[1]) + int(5e4)

@@ -10,7 +10,7 @@ let svgLayer = document.getElementById("svgLayer"); // hidden layer that goes ab
 const shotWidth  = '14'; // how big to make the shot line
 const SCALE_FACTOR = 10;
 const SIM_RATE = 0.01;
-let REFRESH_TIME = 10;
+let REFRESH_TIME = 8;
 let SPEEDUP = false;
 const INDICATOR_FONT_SIZE = '16px';
 const MAX_VEL = 1e4; // max velocity of a shot
@@ -32,8 +32,8 @@ function attatchEventListenersToCueBall() {
             if (isDragging) {
                 const newMousePosition = getSVGFromMouse(event, svgLayer);
                 // Calculate the movement of the mouse relative to the initial mouse position
-                const dx = initialMousePosition.x - newMousePosition.x;
-                const dy = initialMousePosition.y - newMousePosition.y;
+                const dx = (newMousePosition.x - initialMousePosition.x);
+                const dy = (newMousePosition.y - initialMousePosition.y);
 
                 // cueballpos - endcursorpos.x
                 
@@ -46,30 +46,17 @@ function attatchEventListenersToCueBall() {
                 const cueBallMousePos = getMouseFromSVG(initialCueBallPosition, table);
 
                 shotIndicator = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                // shotIndicator.setAttribute('stroke', 'rgb(182, 125, 60)');
-                shotIndicator.setAttribute('stroke', 'rgba(139, 69, 19, 0.5)'); // Brown shade
-                shotIndicator.setAttribute('stroke-width', shotWidth);
-                shotIndicator.setAttribute('stroke-linecap', 'round');
-                shotIndicator.setAttribute('stroke-linejoin', 'round');
-                shotIndicator.setAttribute('pointer-events', 'none');
+                shotIndicator.setAttribute('class', 'shotIndicator');
 
-                shotIndicator2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                shotIndicator2.setAttribute('stroke', 'rgba(255, 255, 255, 0.5)'); // White shade
-                shotIndicator2.setAttribute('stroke-width', '10');
-                // shotIndicator2.setAttribute('stroke-linecap', 'round');
-                // shotIndicator2.setAttribute('stroke-linejoin', 'round');
-                shotIndicator2.setAttribute('stroke-dasharray', '5,5'); // Dashed line
-                shotIndicator2.setAttribute('pointer-events', 'none');
+                // shotIndicator2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                 
-                shotIndicator2.setAttribute('x1', cueBallMousePos.x);
-                shotIndicator2.setAttribute('y1', cueBallMousePos.y);
-                shotIndicator2.setAttribute('x2', (newMousePosition.x));
-                shotIndicator2.setAttribute('y2', (newMousePosition.y));
+                // shotIndicator2.setAttribute('x1', cueBallMousePos.x);
+                // shotIndicator2.setAttribute('y1', cueBallMousePos.y);
+                // shotIndicator2.setAttribute('x2', (newMousePosition.x));
+                // shotIndicator2.setAttribute('y2', (newMousePosition.y));
 
                 shotIndicator.setAttribute('x1', cueBallMousePos.x);
                 shotIndicator.setAttribute('y1', cueBallMousePos.y);
-
-                console.log(newMousePosition, initialMousePosition);
                 shotIndicator.setAttribute('x2', (newMousePosition.x));
                 shotIndicator.setAttribute('y2', (newMousePosition.y));
 
@@ -104,11 +91,10 @@ function attatchEventListenersToCueBall() {
                 }
                 const formattedXVel = Math.round(x_vel * 10) / 10;
                 const formattedYVel = Math.round(y_vel * 10) / 10;
-                // text.textContent = `Velocity: (${formattedXVel.toFixed(1)}, ${formattedYVel.toFixed(1)})`;
-                // text.textContent = `(${formattedXVel.toFixed(1)}, ${formattedYVel.toFixed(1)})`;
-                // svgLayer.appendChild(text);
+                document.getElementById("speedBox").innerHTML = `<div class=\"infoBoxLeadingText\" >Shot Speed: </div>\
+                (${formattedXVel.toFixed(0)}, ${formattedYVel.toFixed(0)})`;
                 svgLayer.appendChild(shotIndicator);
-                svgLayer.appendChild(shotIndicator2);
+                // svgLayer.appendChild(shotIndicator2);
             }
         }
         function onMouseUp(event) {
@@ -149,9 +135,10 @@ function attatchEventListenersToCueBall() {
                 if (shotIndicator) {
                     shotIndicator.remove();
                 }
-                if (text) {
-                    text.remove();
+                if (shotIndicator2) {
+                    shotIndicator2.remove();
                 }
+                document.getElementById("speedBox").innerHTML = `<div class=\"infoBoxLeadingText\" >Shot Speed: </div>N/A`;
             }
         }
     }
@@ -161,6 +148,18 @@ function attatchEventListenersToCueBall() {
     });
 }
 // Right click event listener to cancel the shot
+
+function setup() {
+    cueBall = document.getElementById("00");
+    table = document.getElementById("poolTable");
+    document.body.style.cursor = "auto";
+    table.addEventListener('contextmenu', function(event) {
+        event.preventDefault(); // prevent right click on table
+    });
+    svgLayer = document.getElementById("svgLayer"); // hidden layer that goes above the pool table 
+    // console.log(cueBall, table, svgLayer);
+    attatchEventListenersToCueBall();
+}
 
 function addEventListenersToTable() {
     table.addEventListener('mousedown', function(event) {
@@ -178,13 +177,13 @@ function addEventListenersToTable() {
 function onMouseDownTable(event, table) {
     if (event.button === 2) { // Check for right mouse button
         SPEEDUP = true
-        // console.log("INCREASING SIM SPEED");
+        document.body.style.cursor = "url(\"images/fast_cursor.bmp\"), auto";
     }
 }
 
 function onTableMouseUp(event) {
     SPEEDUP = false
-    // console.log("REDUCING SIM SPEED");
+    document.body.style.cursor = "auto";
 }
 
 attatchEventListenersToCueBall();
@@ -195,7 +194,6 @@ function getSVGFromMouse(event, SVGObject) {
     const point = document.createElementNS('http://www.w3.org/2000/svg', 'svg').createSVGPoint();
     point.x = event.clientX;
     point.y = event.clientY;
-    // const svg = document.getElementById('poolTable');
     return point.matrixTransform(SVGObject.getScreenCTM().inverse());
 }
 
@@ -224,7 +222,7 @@ function sendShotData(shotData) {
             }
         };
         xhr.send(JSON.stringify(shotData));
-        console.log("sent shot data:" + shotData.x_vel, shotData.y_vel)
+        console.log("sent shot data:" + shotData.velocity.x_vel, shotData.velocity.y_vel)
     });
 }
 
@@ -232,15 +230,14 @@ async function handleShotData(shotData) {
     try {
         const TextData = await sendShotData(shotData);
         var svgData = TextData.split('\n\n'); // Split by double newline characters
-        console.log(svgData.length)
-        
+        // console.log(svgData.length)
         for (let i = 0; i < svgData.length - 2; i += 2) {
             if (SPEEDUP && (i % (2 * SPEEDUP_FACTOR) == 0)) {
                 // skip every other frame
                 continue;
             }
             svgRefreshFunction(svgData[i].trim(), svgData[i+1].trim());
-            await new Promise(resolve => setTimeout(resolve, REFRESH_TIME));
+            await new Promise(resolve => setTimeout(resolve, REFRESH_TIME)); // wait for period
         }
         if (svgData[svgData.length-1] == "True") {
             console.log("CUE BALL WAS SUNK!");
@@ -288,23 +285,14 @@ function getAllSVGs(endTime, callback) {
 }
 
 function refreshPage() {
-    // Create a new XMLHttpRequest object
     const xhttp = new XMLHttpRequest();
-
     xhttp.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
-            console.log("successful refresh");
+            // console.log("successful refresh");
             // Replace the current document body with the fetched HTML content
             document.body.innerHTML = this.responseText;
             // reset all the key elements
-            cueBall = document.getElementById("00");
-            table = document.getElementById("poolTable");
-            table.addEventListener('contextmenu', function(event) {
-                event.preventDefault(); // prevent right click on table
-            });
-            svgLayer = document.getElementById("svgLayer"); // hidden layer that goes above the pool table 
-            // console.log(cueBall, table, svgLayer);
-            attatchEventListenersToCueBall();
+            setup();
         }
     };
     // Open a GET request
@@ -315,8 +303,8 @@ function refreshPage() {
 function getMouseFromSVG(SVGTableCoordinate, table) {
     const svgRect = table.getBoundingClientRect();
     const base = table.viewBox.baseVal;
-    const mouseX = svgRect.x + SVGTableCoordinate.x / ((base.width + 2 * base.x)) * (svgRect.right - svgRect.left);
-    const mouseY = svgRect.y + SVGTableCoordinate.y / ((base.height + 2 * base.y)) * (svgRect.bottom - svgRect.top);
+    const mouseX = svgRect.x + SVGTableCoordinate.x / ((base.width + 2 * base.x)) * (svgRect.right - svgRect.left) - 3;
+    const mouseY = svgRect.y + SVGTableCoordinate.y / ((base.height + 2 * base.y)) * (svgRect.bottom - svgRect.top) - 5;
     // Return absolute mouse coordinates
     return { x: mouseX, y: mouseY };
 }

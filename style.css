@@ -4,16 +4,16 @@ body{
     background-color: rgba(107, 96, 96, 0.445);
 }
 h1{
-    font-size: 2.4rem;
-    color: hsl(207, 54%, 62%);
-    font-family: 'OptimusPrincepsSemiBold', 'Times New Roman', 'MV Boli', Arial, Helvetica, sans-serif;
+    font-size: 4rem;
+    color: rgb(214, 230, 230);
+    font-family: "DMC5Font";
 }
 h2{
     font-size: 1rem;
     color: rgb(236, 77, 48);
 }
 .winner-container {
-    background-color: hsl(180, 41%, 53%);
+    background-color: hsl(229, 85%, 51%);
     text-align: center;
     color: beige;
     font-family:Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
@@ -26,7 +26,7 @@ h2{
     padding-bottom: 40px;
 }
 form{
-    background-color: hsl(180, 2%, 88%);
+    background-color: hsl(229, 66%, 45%);
     text-align: center;
     max-width: 600px;
     margin: auto;
@@ -43,17 +43,19 @@ form{
 .infoBox{
     
     color: rgb(255, 255, 255);
-    /* "MV boli" */
+    /* font-family: "MV boli"; */
     font-family: "Times New Roman";
     background-color: rgb(124, 123, 123);
-    font-size: 2.2rem;
-    margin: 0px 0px 15px 0px;
+    font-size: 2.1rem;
+    margin: 0px 0px 10px 0px;
     border: 5px solid rgb(0, 0, 0);
     border-radius: 5px;
 }
 .infoBoxLeadingText {
-    color: rgb(238, 196, 196);
+    color: rgb(184, 31, 31);
+    /* color: rgb(238, 196, 196); */
     display: inline;
+    -webkit-text-stroke: 0.5px white; /* WebKit/Blink browsers */
     font-family:'edo sz','adobe garamond',Verdana, arial;
 }
 .textBox{
@@ -66,10 +68,12 @@ form{
 }
 label{
     /* font-family: 'edo-sz'; */
-    color: rgba(255, 39, 39, 0.822);
+    color: rgba(160, 160, 160, 0.822);
     font-weight: bold;
-    font-size: 1.5rem;
-    font-family: 'edo sz','adobe garamond',Verdana, arial; /* haha funny yakuzer font */
+    font-size: 2.5rem;
+    /* font-family: 'edo sz','adobe garamond',Verdana, arial; haha funny yakuzer font */
+    color: rgb(214, 230, 230);
+    font-family: "DMC5Font";
     margin-bottom: 10px;
 }
 button{
@@ -122,16 +126,22 @@ svg {
     position: fixed;
     z-index: 1;
     width: 100%;
-    height: 100%;
+    min-height: 120%;
     top: 0;
     left: 0;
     pointer-events: none;
     border: solid black 5px;
 }
-.line {
+.shotIndicator {
+    stroke: rgba(255, 255, 255, 0.80);
+    stroke-linejoin: round;
+    /* stroke-linecap: round; */
+    pointer-events: none;
+    /* stroke-dashoffset: 20px; */
+    stroke-dasharray: 15px, 25px;
+    stroke-width: 10px;
+    pointer-events: none;
+}
+.shotIndicator2 {
     stroke: rgb(182, 125, 60);
-    stroke-width: 25;
-    pointer-events: none;
-    stroke-dasharray: 25*2, 25;
-    pointer-events: none;
 }

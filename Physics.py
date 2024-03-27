@@ -11,14 +11,14 @@ HEADER = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg id="poolTable" width="700" height="1375" viewBox="-25 -25 1400 2750"
 xmlns="http://www.w3.org/2000/svg"
 xmlns:xlink="http://www.w3.org/1999/xlink">
-<rect width="1350" height="2700" x="0" y="0" fill="#C0D0C0" />"""
+<rect width="1350" height="2700" x="0" y="0" fill="#0e3b0d" />"""
 
 FOOTER = """</svg>\n"""
 
 ################################################################################
 # import constants from phylib to global varaibles (some new constants)
 
-FRAME_INTERVAL = 0.01 * 1 # constant frame rate for database operations
+FRAME_INTERVAL = 0.01 # constant frame rate for database operations
 BALL_RADIUS    = phylib.PHYLIB_BALL_RADIUS
 BALL_DIAMETER  = phylib.PHYLIB_BALL_DIAMETER
 HOLE_RADIUS    = phylib.PHYLIB_HOLE_RADIUS
@@ -165,7 +165,7 @@ class HCushion(phylib.phylib_object):
     # add an svg method here
     
     def svg(self):
-        return """ <rect width="1400" height="25" x="-25" y="%d" fill="darkgreen" />\n""" \
+        return """ <rect width="1400" height="25" x="-25" y="%d" fill="#7c3f00" />\n""" \
         % (-25 if self.obj.hcushion.y == 0.0 else 2700)
 
 ################################################################################
@@ -191,7 +191,7 @@ class VCushion(phylib.phylib_object):
 
     # add an svg method here
     def svg(self):
-        return """ <rect width="25" height="2750" x="%d" y="-25" fill="darkgreen" />\n""" % (-25 if self.obj.vcushion.x == 0.0 else 1350)
+        return """ <rect width="25" height="2750" x="%d" y="-25" fill="#7c3f00" />\n""" % (-25 if self.obj.vcushion.x == 0.0 else 1350)
 
 ################################################################################
 class Table(phylib.phylib_table):
@@ -328,8 +328,7 @@ class Table(phylib.phylib_table):
         ball_list = []
         for item in self:
             if isinstance(item, (RollingBall, StillBall)):
-                number = item.obj.still_ball.number
-                ball_list.append(number)
+                ball_list.append(item.obj.still_ball.number)
         return tuple(ball_list)
 
 ################################################################################
@@ -646,7 +645,7 @@ class Game:
             if (current_segment := table.segment()) is None:
                 break
             num_iterations = floor((current_segment.time - table.time) / FRAME_INTERVAL)
-            print(f"segment {count} has {num_iterations} svgs")
+            # print(f"segment {count} has {num_iterations} svgs")
             for i in range(num_iterations):
                 roll_time : int = i * FRAME_INTERVAL
                 table_inner : Table = table.roll(roll_time)
@@ -658,7 +657,7 @@ class Game:
             table = current_segment
             if count >= 500:
                 print(f"TOO MANY SEGMENTS (COUNTED {count}). ABORTING SHOOT")
-                print("CUE BALL: " + str(cue_ball))
+                print("SHOT PARAMS: ", xvel, yvel)
                 print("CURRENT SEGMENT (SHOULD NOT BE NONE)" + str(current_segment))
                 return
         table_shot_values = [(table_ID, shot_ID) for table_ID in table_ID_list]
@@ -671,10 +670,10 @@ class Game:
 
     def set_cue_ball(self, cue_ball : Union[StillBall, RollingBall], xvel: float, yvel: float) -> Union[StillBall, RollingBall, None]:
         # should be okay to access as stillball even if rolling
-        cue_ball_pos = Coordinate(cue_ball.obj.still_ball.pos.x, cue_ball.obj.still_ball.pos.y)
+        # cue_ball_pos = Coordinate(cue_ball.obj.still_ball.pos.x, cue_ball.obj.still_ball.pos.y)
         cue_ball.type = phylib.PHYLIB_ROLLING_BALL
         cue_ball.obj.rolling_ball.number = 0 # not necessary but why not
-        cue_ball.obj.rolling_ball.pos = cue_ball_pos
+        # cue_ball.obj.rolling_ball.pos = cue_ball_pos
         cue_ball.obj.rolling_ball.vel = Coordinate(xvel, yvel)
         cue_ball.obj.rolling_ball.acc = get_acceleration_coordinates(xvel, yvel)
         return cue_ball
@@ -718,8 +717,29 @@ class Game:
         self.close_cursor()
         return x
 
+    def get_most_recent_shotID(self):
+        self.open_cursor()
+        x = Game.current_cursor.execute("SELECT COALESCE(MAX(s.SHOTID), 0) FROM Shot as s\
+            INNER JOIN TableShot as ts on (ts.SHOTID = s.SHOTID) WHERE s.GAMEID = ?;", (self.game_ID,)).fetchone()[0]
+        self.close_cursor()
+        return x
+
+    def get_first_tableID_for_shot(self, shot_ID : int) -> int:
+        self.open_cursor()
+        id = Game.current_cursor.execute("SELECT MIN(t.TABLEID) FROM (TableShot as t INNER JOIN SHOT\
+                                                as s ON (t.SHOTID = s.SHOTID)) WHERE s.GAMEID = ? and s.SHOTID = ?;", (self.game_ID, shot_ID)).fetchone()[0]
+        self.close_cursor()
+        return id
+    
+    def get_last_tableID_for_shot(self, shot_ID : int) -> int:
+        self.open_cursor()
+        id = Game.current_cursor.execute("SELECT COALESCE(MAX(t.TABLEID), 0) FROM (TableShot as t INNER JOIN SHOT\
+                                                as s ON (t.SHOTID = s.SHOTID)) WHERE s.GAMEID = ? and s.SHOTID = ?;", (self.game_ID, shot_ID)).fetchone()[0]
+        self.close_cursor()
+        return id
+
 ################################################################################    
-def get_acceleration_coordinates(rolling_ball_dx: float, rolling_ball_dy: float) -> Union[Coordinate, None]:
+def get_acceleration_coordinates(rolling_ball_dx: float, rolling_ball_dy: float) -> Coordinate:
         from math import hypot
         rolling_ball_a_x, rolling_ball_a_y = 0.0, 0.0
         rolling_ball_speed = hypot(rolling_ball_dx, rolling_ball_dy)
