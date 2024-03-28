@@ -1,4 +1,5 @@
 CC = clang
+# -O3 for optimization
 CFLAGS = -Wall -std=c99 -pedantic -fpic
 .PHONY: all clean #phony targets
 

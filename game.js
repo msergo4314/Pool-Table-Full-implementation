@@ -1,11 +1,11 @@
 // start of script
-let cueBall = document.getElementById('00'); // the cueball has an ID (ball number) of 0
-let isDragging = false;
+let isDragging, flashing = false;
 let shotIndicator, shotIndicator2; // Define shotIndicator variable outside of event listeners
 let x_vel, y_vel;
 let text; // Define text variable outside of event listeners
 let SPEEDUP_FACTOR = 2;
 let table = document.getElementById("poolTable");
+let cueBall, cueBallBoundingRectangle;
 let svgLayer = document.getElementById("svgLayer"); // hidden layer that goes above the pool table 
 const shotWidth  = '14'; // how big to make the shot line
 const SCALE_FACTOR = 10;
@@ -16,6 +16,8 @@ const INDICATOR_FONT_SIZE = '16px';
 const MAX_VEL = 1e4; // max velocity of a shot
 const maxIndicatorLength = 100;
 
+setup();
+
 function attatchEventListenersToCueBall() {
     function onMouseDown (event) {
         isDragging = true;
@@ -24,7 +26,6 @@ function attatchEventListenersToCueBall() {
             y: cueBall.cy.baseVal.value
         };
         const initialMousePosition = getSVGFromMouse(event, svgLayer);
-        // Update the mouse position as the mouse moves
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
     
@@ -43,7 +44,7 @@ function attatchEventListenersToCueBall() {
                 if (shotIndicator2) {
                     shotIndicator2.remove();
                 }
-                const cueBallMousePos = getMouseFromSVG(initialCueBallPosition, table);
+                const cueBallMousePos = getMouseFromSVG(svgLayer);
 
                 shotIndicator = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                 shotIndicator.setAttribute('class', 'shotIndicator');
@@ -71,27 +72,16 @@ function attatchEventListenersToCueBall() {
                 // console.log("x_vel:", x_vel);
                 // console.log("y_vel:", y_vel);
                 // Ensure that the velocities don't exceed 4000
-                if (Math.abs(x_vel) > MAX_VEL) {
-                    // console.log("x_vel exceeded 4000");
-                    if (x_vel > 0) {
-                        x_vel = MAX_VEL;
-                    }
-                    else {
-                        x_vel = -MAX_VEL;
-                    }
-                }
-                if (Math.abs(y_vel) > MAX_VEL) {
-                    // console.log("y_vel exceeded 4000");
-                    if (y_vel > 0) {
-                        y_vel = MAX_VEL;
-                    }
-                    else {
-                        y_vel = -MAX_VEL;
-                    }
+                let vel = Math.hypot(x_vel, y_vel);
+                if (vel > MAX_VEL) {
+                    ratio = MAX_VEL / vel;
+                    x_vel *= ratio;
+                    y_vel *= ratio;
                 }
                 const formattedXVel = Math.round(x_vel * 10) / 10;
                 const formattedYVel = Math.round(y_vel * 10) / 10;
                 document.getElementById("speedBox").innerHTML = `<div class=\"infoBoxLeadingText\" >Shot Speed: </div>\
+
                 (${formattedXVel.toFixed(0)}, ${formattedYVel.toFixed(0)})`;
                 svgLayer.appendChild(shotIndicator);
                 // svgLayer.appendChild(shotIndicator2);
@@ -150,15 +140,15 @@ function attatchEventListenersToCueBall() {
 // Right click event listener to cancel the shot
 
 function setup() {
-    cueBall = document.getElementById("00");
     table = document.getElementById("poolTable");
+    cueBall = table.querySelector('circle[fill="WHITE"]') // the cueball has an ID (ball number) of 0
+    cueBallBoundingRectangle = cueBall.getBoundingClientRect();
     document.body.style.cursor = "auto";
-    table.addEventListener('contextmenu', function(event) {
-        event.preventDefault(); // prevent right click on table
-    });
-    svgLayer = document.getElementById("svgLayer"); // hidden layer that goes above the pool table 
-    // console.log(cueBall, table, svgLayer);
+    addEventListenersToTable();
+    svgLayer = document.getElementById("svgLayer"); // hidden layer that goes above the pool table
+    console.log("NEW CUEBALL: ", cueBall);
     attatchEventListenersToCueBall();
+    // console.log(cueBall, table, svgLayer);
 }
 
 function addEventListenersToTable() {
@@ -177,7 +167,10 @@ function addEventListenersToTable() {
 function onMouseDownTable(event, table) {
     if (event.button === 2) { // Check for right mouse button
         SPEEDUP = true
-        document.body.style.cursor = "url(\"images/fast_cursor.bmp\"), auto";
+        if (flashing) {
+            document.body.style.cursor = "url(\"images/fast_cursor.bmp\"), auto";
+        }
+        console.log(document.body.style.cursor);
     }
 }
 
@@ -185,9 +178,6 @@ function onTableMouseUp(event) {
     SPEEDUP = false
     document.body.style.cursor = "auto";
 }
-
-attatchEventListenersToCueBall();
-addEventListenersToTable();
 
 function getSVGFromMouse(event, SVGObject) {
     // converts mouse position to svg position via black magic
@@ -231,6 +221,7 @@ async function handleShotData(shotData) {
         const TextData = await sendShotData(shotData);
         var svgData = TextData.split('\n\n'); // Split by double newline characters
         // console.log(svgData.length)
+        flashing = true;
         for (let i = 0; i < svgData.length - 2; i += 2) {
             if (SPEEDUP && (i % (2 * SPEEDUP_FACTOR) == 0)) {
                 // skip every other frame
@@ -243,6 +234,7 @@ async function handleShotData(shotData) {
             console.log("CUE BALL WAS SUNK!");
             // window.alert(`The Cue ball was sunk. Reverting cue ball position to initial spot.\n`);
         }
+        flashing = false;
         refreshPage();
         SPEEDUP = false;
     } catch (error) {
@@ -300,11 +292,13 @@ function refreshPage() {
     xhttp.send();
 }
 
-function getMouseFromSVG(SVGTableCoordinate, table) {
-    const svgRect = table.getBoundingClientRect();
-    const base = table.viewBox.baseVal;
-    const mouseX = svgRect.x + SVGTableCoordinate.x / ((base.width + 2 * base.x)) * (svgRect.right - svgRect.left) - 3;
-    const mouseY = svgRect.y + SVGTableCoordinate.y / ((base.height + 2 * base.y)) * (svgRect.bottom - svgRect.top) - 5;
+function getMouseFromSVG(screenSVGLayer) {
     // Return absolute mouse coordinates
+    const cueBall_x = cueBallBoundingRectangle.left + (cueBallBoundingRectangle.width / 2);
+    const cueBall_y = cueBallBoundingRectangle.top + (cueBallBoundingRectangle.height / 2);
+
+    const mouseX = cueBall_x - screenSVGLayer.getBoundingClientRect().left;
+    const mouseY = cueBall_y - screenSVGLayer.getBoundingClientRect().top;
+
     return { x: mouseX, y: mouseY };
 }

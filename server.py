@@ -16,18 +16,15 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 # used to parse the URL and extract form data for GET requests
 from urllib.parse import urlparse, parse_qsl, parse_qs
 
-def remove_video(video_file_name: str = "svg_movie", extension: str = "webm" ):
+def remove_video(video_file_name: str = output_name, extension: str = extension):
     if os.path.exists(f'{video_file_name}.{extension}'):
         os.remove(f"{video_file_name}.{extension}")
     return
 
 def make_default_table() -> Physics.Table:
     
-    def randomMillimeterOffset() -> float:
-        return 4.0
-        import random
-        return random.random() + 1
-    
+    def millimeter_offset() -> float:
+        return 14.0
     
     # Setup the table
     table_to_return = Physics.Table()  # Create a new table
@@ -39,8 +36,8 @@ def make_default_table() -> Physics.Table:
     root_3 = math.sqrt(3.0)
     for row in range(5):
         for ball in range(row + 1):
-            x = Physics.TABLE_WIDTH / 2.0 + (ball - (row + 1) / 2.0) * (Physics.BALL_DIAMETER + randomMillimeterOffset())
-            y = Physics.TABLE_WIDTH / 2.0 - root_3 / 2.0 * (Physics.BALL_DIAMETER + randomMillimeterOffset()) * row
+            x = Physics.TABLE_WIDTH / 2.0 + (ball - (row + 1) / 2.0) * (Physics.BALL_DIAMETER + millimeter_offset())
+            y = Physics.TABLE_WIDTH / 2.0 - root_3 / 2.0 * (Physics.BALL_DIAMETER + millimeter_offset()) * row
             current_ball_number = ball_ordering.pop(0)
             pos = Physics.Coordinate(x, y)
             sb = Physics.StillBall(current_ball_number, pos)
@@ -115,6 +112,8 @@ class ServerGame(Physics.Game):
     
     SVG_BALL_DISPLAY_X : int = 500
     SVG_BALL_DISPLAY_Y : int = 70
+    HIGH_STRING : str = " (HIGH)"
+    LOW_STRING : str = " (LOW)"
     
     def __init__(self, gameName: str=None, player_one: str = None, player_two: str = None, game_ID : int = None):
         from random import random
@@ -136,6 +135,7 @@ class ServerGame(Physics.Game):
         self.eight_ball_sunk_valid : bool = False
         self.winner : str = None
         self.sunk_balls : list[int] = []
+        # Starting table is the largest tableID but this is not true if the game is loaded from the db
         self.starting_table_ID : int = self.get_total_number_of_tables_in_database()
         print(self.starting_table_ID)
         # exclude the 8 ball and the cue ball from both lists
@@ -157,7 +157,6 @@ class ServerGame(Physics.Game):
         self.extra_turn = False
         # perform the shot. Split the current player for when (LOW) or (HIGH) are appended (will not be in db)
         playerName = self.remove_high_low_if_present()
-        print(self.game_ID)
         segments : tuple[Physics.Table] = super().shoot(gameName=self.game_Name, playerName=playerName,\
             table=self.most_recent_table, xvel=float(x_vel), yvel=float(y_vel))
         self.analyze_segments(segments) # update scores or end game as needed
@@ -201,7 +200,8 @@ class ServerGame(Physics.Game):
                         if previous_ball == 8:
                             print("SUNK 8 BALL")
                             self.eight_ball_sunk = True
-                            if len(previous_balls) == 2:
+                            if (self.current_player.endswith(ServerGame.LOW_STRING) and len(self.low_balls) == 0) or\
+                                (self.current_player.endswith(ServerGame.HIGH_STRING) and len(self.high_balls) == 0):
                                 # case for only cue ball and 8 ball
                                 self.winner = self.remove_high_low_if_present()
                                 print("VALID 8 BALL SUNK")
@@ -217,11 +217,11 @@ class ServerGame(Physics.Game):
                         if self.set_high_low is False:
                             if previous_ball in self.low_balls:
                                 print(f"SETTING CURRENT PLAYER {self.current_player} LOW -- ball {previous_ball} was sunk")
-                                self.set_high_low_values(" (LOW)")
+                                self.set_high_low_values(ServerGame.LOW_STRING)
                                 self.low_balls.remove(previous_ball)
                             else:
                                 print(f"SETTING CURRENT PLAYER {self.current_player} HIGH -- ball {previous_ball} was sunk")
-                                self.set_high_low_values(" (HIGH)")
+                                self.set_high_low_values(ServerGame.HIGH_STRING)
                                 self.high_balls.remove(previous_ball)
                             self.extra_turn = True
                             self.sunk_balls.append(previous_ball)
@@ -229,21 +229,21 @@ class ServerGame(Physics.Game):
                         
                         else:
                             print(self.current_player, previous_ball)
-                            if (self.current_player.endswith(" (LOW)") and previous_ball in self.low_balls):
+                            if (self.current_player.endswith(ServerGame.LOW_STRING) and previous_ball in self.low_balls):
                                 self.low_balls.remove(previous_ball)
                                 print(f"LOW BALL {previous_ball} was sunk")
                                 self.increase_player_score()
                                 self.extra_turn = True
-                            elif (self.current_player.endswith(" (HIGH)") and previous_ball in self.high_balls):
+                            elif (self.current_player.endswith(ServerGame.HIGH_STRING) and previous_ball in self.high_balls):
                                 self.high_balls.remove(previous_ball)
                                 print(f"HIGH BALL {previous_ball} was sunk")
                                 self.increase_player_score()
                                 self.extra_turn = True
-                            elif (self.current_player.endswith(" (LOW)") and previous_ball in self.high_balls):
+                            elif (self.current_player.endswith(ServerGame.LOW_STRING) and previous_ball in self.high_balls):
                                 self.high_balls.remove(previous_ball)
                                 print(f"HIGH BALL {previous_ball} was sunk")
                                 self.increase_player_score(self.other_player)
-                            elif (self.current_player.endswith(" (HIGH)") and previous_ball in self.low_balls):
+                            elif (self.current_player.endswith(ServerGame.HIGH_STRING) and previous_ball in self.low_balls):
                                 self.low_balls.remove(previous_ball)
                                 print(f"LOW BALL {previous_ball} was sunk")
                                 self.increase_player_score(self.other_player)
@@ -266,11 +266,11 @@ class ServerGame(Physics.Game):
         if self.current_player == self.player1_name:
             self.player1_name += high_or_low
             self.current_player = self.player1_name
-            self.player2_name += " (LOW)" if high_or_low == " (HIGH)" else " (HIGH)"
+            self.player2_name += ServerGame.LOW_STRING if high_or_low == ServerGame.HIGH_STRING else ServerGame.LOW_STRING
         else:
             self.player2_name += high_or_low
             self.current_player = self.player2_name
-            self.player1_name += " (LOW)" if high_or_low == " (HIGH)" else " (HIGH)"
+            self.player1_name += ServerGame.LOW_STRING if high_or_low == ServerGame.HIGH_STRING else ServerGame.LOW_STRING
         self.increase_player_score()
         self.set_high_low = True # never need to set again
         return
@@ -588,9 +588,6 @@ class MyHandler(BaseHTTPRequestHandler):
         score_1 = current_game.player_1_score
         score_2 = current_game.player_2_score
         
-        score_1_style_text = get_style_text(score_1)
-        score_2_style_text = get_style_text(score_2)
-        
         response_content = f"""<!DOCTYPE html>
                             <html lang="en">
                             <head>
@@ -609,7 +606,7 @@ class MyHandler(BaseHTTPRequestHandler):
                                     {self.box('<div class="infoBoxLeadingText">Player Two: </div>' + player_two)}
                                     {self.box('<div class="infoBoxLeadingText">Table time: </div>' + str(round(current_table.time, 2)), ID="time")}
                                     {self.box(f'<div class="infoBoxLeadingText">Player one score: </div>{str(score_1)} {get_style_text(score_1)}', ID="p1score")}
-                                    {self.box(f'<div class="infoBoxLeadingText">Player one score: </div>{str(score_2)} {get_style_text(score_2)}', ID="p2score")}
+                                    {self.box(f'<div class="infoBoxLeadingText">Player two score: </div>{str(score_2)} {get_style_text(score_2)}', ID="p2score")}
                                     {self.box('<div class="infoBoxLeadingText">Current Player: </div>' + current_game.current_player)}
                                     {self.box('<div class="infoBoxLeadingText">Current Shot Speed: </div>N/A', ID="speedBox")}
                                     {self.box('<div class="infoBoxLeadingText">Current LOW balls: </div>' + current_game.low_balls_svg())}

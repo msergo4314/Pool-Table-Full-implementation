@@ -204,20 +204,18 @@ void phylib_free_table(phylib_table *table) {
     }
     for (int i = 0; i < PHYLIB_MAX_OBJECTS; i++) {
         if ((table->object)[i] != NULL) {
-            // printf("freeing %p\n", (void*)table->object[i]);
             free((table->object)[i]);
             (table->object)[i] = NULL;
         }
     }
-    // printf("freeing %p\n", (void*)table);
     free(table);
 }
 
 phylib_coord phylib_sub(phylib_coord c1, phylib_coord c2) {
-    phylib_coord diff;
-    // no fabs for now
-    diff.x = (c1.x - c2.x);
-    diff.y = (c1.y - c2.y);
+    phylib_coord diff = {
+    (c1.x - c2.x),
+    (c1.y - c2.y)
+    };
     return diff;
 }
 
@@ -280,11 +278,11 @@ void phylib_roll(phylib_object *new, phylib_object *old, double time) {
     new->obj.rolling_ball.vel.x = velocity_old_x + acceleration_old_x * time;
     new->obj.rolling_ball.vel.y = velocity_old_y + acceleration_old_y * time;
     // in the event of a sign change (on vel), set velocity and acceleration to be 0
-    if (!same_sign(new->obj.rolling_ball.vel.x, velocity_old_x)) {
+    if (new->obj.rolling_ball.vel.x * velocity_old_x < 0) {
         new->obj.rolling_ball.vel.x = 0.0;
         new->obj.rolling_ball.acc.x = 0.0;
     }
-    if (!same_sign(new->obj.rolling_ball.vel.y, velocity_old_y)) {
+    if (new->obj.rolling_ball.vel.y * velocity_old_y < 0) {
         new->obj.rolling_ball.vel.y = 0.0;
         new->obj.rolling_ball.acc.y = 0.0;
     }
@@ -442,16 +440,18 @@ phylib_table *phylib_segment(phylib_table *table) {
                 }
             }
             for (int i = 0; i < PHYLIB_MAX_OBJECTS; i++) {
-                for(int j = 0; j < PHYLIB_MAX_OBJECTS; j++) {
-                    if ((new_table->object)[i] != NULL && (new_table->object)[j] != NULL && j != i && (new_table->object)[i]->type == PHYLIB_ROLLING_BALL) {
-                        if (phylib_distance((new_table->object)[i], (new_table->object)[j]) < 0.0) {
-                            phylib_bounce(&((new_table->object)[i]), &((new_table->object)[j]));
-                            goto function_exit;
+                if (new_table->object[i] && new_table->object[i]->type == PHYLIB_ROLLING_BALL) {
+                    for(int j = 0; j < PHYLIB_MAX_OBJECTS; j++) {
+                        if ((new_table->object)[i] != NULL && (new_table->object)[j] != NULL && j != i && (new_table->object)[i]->type == PHYLIB_ROLLING_BALL) {
+                            if (phylib_distance((new_table->object)[i], (new_table->object)[j]) < 0.0) {
+                                phylib_bounce(&((new_table->object)[i]), &((new_table->object)[j]));
+                                goto function_exit;
+                            }
                         }
                     }
-                }
-                if (phylib_stopped((new_table->object)[i])) {
-                    goto function_exit;
+                    if (phylib_stopped((new_table->object)[i])) {
+                        goto function_exit;
+                    }
                 }
             }
         time += PHYLIB_SIM_RATE;
