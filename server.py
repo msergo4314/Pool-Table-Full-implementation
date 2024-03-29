@@ -186,6 +186,7 @@ class ServerGame(Physics.Game):
             self.most_recent_table += Physics.StillBall(0, Physics.Coordinate(Physics.TABLE_WIDTH / 2.0, Physics.TABLE_LENGTH - Physics.TABLE_WIDTH / 2.0))
         if not self.extra_turn and not self.winner:
             self.switch_current_player()
+        self.current_cursor.commit()
         return tuple(svg_list)
     
     def analyze_segments(self, segments : tuple[Physics.Table]) -> None:
@@ -266,11 +267,11 @@ class ServerGame(Physics.Game):
         if self.current_player == self.player1_name:
             self.player1_name += high_or_low
             self.current_player = self.player1_name
-            self.player2_name += ServerGame.LOW_STRING if high_or_low == ServerGame.HIGH_STRING else ServerGame.LOW_STRING
+            self.player2_name += ServerGame.LOW_STRING if high_or_low == ServerGame.HIGH_STRING else ServerGame.HIGH_STRING
         else:
             self.player2_name += high_or_low
             self.current_player = self.player2_name
-            self.player1_name += ServerGame.LOW_STRING if high_or_low == ServerGame.HIGH_STRING else ServerGame.LOW_STRING
+            self.player1_name += ServerGame.LOW_STRING if high_or_low == ServerGame.HIGH_STRING else ServerGame.HIGH_STRING
         self.increase_player_score()
         self.set_high_low = True # never need to set again
         return

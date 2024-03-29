@@ -118,7 +118,6 @@ function attatchEventListenersToCueBall() {
                         console.log('Shot canceled by user');
                     }
                     shotIndicator.remove();
-                    // text.remove();
                 }
             } else { // For other mouse buttons, cancel the shot
                 console.log('Shot canceled due to non-left click');
@@ -141,7 +140,7 @@ function attatchEventListenersToCueBall() {
 
 function setup() {
     table = document.getElementById("poolTable");
-    cueBall = table.querySelector('circle[fill="WHITE"]') // the cueball has an ID (ball number) of 0
+    cueBall = table.querySelector('circle[fill="WHITE"]') // the cueball is the only white ball
     cueBallBoundingRectangle = cueBall.getBoundingClientRect();
     document.body.style.cursor = "auto";
     addEventListenersToTable();
