@@ -321,9 +321,9 @@ class Table(phylib.phylib_table):
 
     def get_cue_ball(self) -> Union[RollingBall, StillBall, None]:
         for object in self:
-                # safe to access like this even for rolling balls due to union in C
-                if isinstance(object, (StillBall, RollingBall)) and object.obj.still_ball.number == 0:
-                    return object
+            # safe to access like this even for rolling balls due to union in C
+            if isinstance(object, (StillBall, RollingBall)) and object.obj.still_ball.number == 0:
+                return object
         return None
 
     def balls_in_table(self) -> tuple[int]:
@@ -354,7 +354,9 @@ class Database:
 
     def createDB(self):
         
-        def create_index_if_not_exists(cursor, index_name, table_name, column_name):
+        def create_index_if_not_exists(cursor, index_name : str, table_name : str, column_name : str):
+            if cursor is None:
+                return
             cursor.execute(f"SELECT name FROM sqlite_master WHERE type='index' AND name='{index_name}'")
             result = cursor.fetchone()
             if result is None:
@@ -394,7 +396,7 @@ class Database:
             return
         table_dictionary = {'Ball'      : "BALLID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, BALLNO INTEGER NOT NULL, \
                                            XPOS FLOAT NOT NULL, YPOS FLOAT NOT NULL, XVEL FLOAT, YVEL FLOAT",
-                            'TTable'     : "TABLEID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, TIME FLOAT NOT NULL",
+                            'TTable'    : "TABLEID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, TIME FLOAT NOT NULL",
                             'BallTable' : "BALLID INTEGER NOT NULL, TABLEID INTEGER NOT NULL, FOREIGN KEY (BALLID) REFERENCES Ball(BALLID), \
                                            FOREIGN KEY (TABLEID) REFERENCES TTable(TABLEID)",
                             'Shot'      : "SHOTID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, PLAYERID INTEGER NOT NULL, \
@@ -504,7 +506,6 @@ class Database:
         for name in table_names:
             string += f"Table {name} data is:\n\n"
             string += self.single_table_str(Database.current_cursor.execute(f"SELECT * FROM '{name}';").fetchall(), nameColumns.get(name)) + '\n'
-        self.current_database_connection.commit()
         self.close_cursor()
         return string.strip()
 
@@ -602,6 +603,7 @@ class Game:
         self.game_Name = gameName
         self.player1_name : str = player1Name
         self.player2_name : str = player2Name
+        self.most_recent_shot_ID : int = None
 
         arguments = (gameID, gameName, player1Name, player2Name)
         if isinstance(gameID, int) and all(obj is None for obj in arguments[1:]):
@@ -743,10 +745,10 @@ class Game:
 
 ################################################################################    
 def get_acceleration_coordinates(rolling_ball_dx: float, rolling_ball_dy: float) -> Coordinate:
-        from math import hypot
-        rolling_ball_a_x, rolling_ball_a_y = 0.0, 0.0
-        rolling_ball_speed = hypot(rolling_ball_dx, rolling_ball_dy)
-        if (rolling_ball_speed > VEL_EPSILON):
-            rolling_ball_a_x = -rolling_ball_dx * DRAG / rolling_ball_speed
-            rolling_ball_a_y = -rolling_ball_dy * DRAG / rolling_ball_speed
-        return Coordinate(rolling_ball_a_x, rolling_ball_a_y)
+    from math import hypot
+    rolling_ball_a_x, rolling_ball_a_y = 0.0, 0.0
+    rolling_ball_speed = hypot(rolling_ball_dx, rolling_ball_dy)
+    if (rolling_ball_speed > VEL_EPSILON):
+        rolling_ball_a_x = -rolling_ball_dx * DRAG / rolling_ball_speed
+        rolling_ball_a_y = -rolling_ball_dy * DRAG / rolling_ball_speed
+    return Coordinate(rolling_ball_a_x, rolling_ball_a_y)

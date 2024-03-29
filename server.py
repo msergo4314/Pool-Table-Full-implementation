@@ -179,7 +179,7 @@ class ServerGame(Physics.Game):
         self.starting_table_ID = self.get_last_tableID_for_shot(self.get_most_recent_shotID())
         print(f"max shot changed to {self.starting_table_ID}")
         self.open_cursor()
-        self.most_recent_table = self.database.readTable(self.starting_table_ID-1)
+        self.most_recent_table = self.database.readTable(self.starting_table_ID - 1)
         # print(self.most_recent_table)
         if self.cue_ball_sunk:
             #insert the cue ball at starting position. If there happens to be a ball there, things will break.
@@ -197,7 +197,6 @@ class ServerGame(Physics.Game):
             if len(segment_balls) != len(previous_balls):
                 for previous_ball in previous_balls:
                     if not (previous_ball in segment_balls):
-                        # print(f"ball {default_ball} not found in segment balls")
                         if previous_ball == 8:
                             print("SUNK 8 BALL")
                             self.eight_ball_sunk = True
