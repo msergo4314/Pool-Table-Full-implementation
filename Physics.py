@@ -659,11 +659,11 @@ class Game:
             table_ID_list.append(Game.database.writeTable(current_segment)  + 1)
             list_of_segments.append(current_segment)
             table = current_segment
-            # if count == 600:
-            #     print(f"TOO MANY SEGMENTS (COUNTED {count}). ABORTING SHOOT")
-            #     print("SHOT PARAMS: ", xvel, yvel)
-            #     print("CURRENT SEGMENT:", str(current_segment), sep='\n')
-            #     return
+            if count == 600:
+                print(f"TOO MANY SEGMENTS -- ENTERING INFINITE LOOP -- (COUNTED {count} SEGMENTS). ABORTING SHOOT")
+                print("SHOT PARAMS: ", xvel, yvel)
+                # print("CURRENT SEGMENT:", str(current_segment), sep='\n')
+                return
         table_shot_values = [(table_ID, shot_ID) for table_ID in table_ID_list]
         self.most_recent_shot_ID = shot_ID
         print(f'Time to shoot: {perf_counter() - start}')

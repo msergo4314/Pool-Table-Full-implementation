@@ -25,6 +25,8 @@ function attatchEventListenersToCueBall() {
             x: cueBall.cx.baseVal.value,
             y: cueBall.cy.baseVal.value
         };
+        cueBall = table.querySelector('circle[fill="WHITE"]') // the cueball is the only white ball
+        cueBallBoundingRectangle = cueBall.getBoundingClientRect();
         const initialMousePosition = getSVGFromMouse(event, svgLayer);
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
@@ -145,7 +147,6 @@ function setup() {
     document.body.style.cursor = "auto";
     addEventListenersToTable();
     svgLayer = document.getElementById("svgLayer"); // hidden layer that goes above the pool table
-    console.log("NEW CUEBALL: ", cueBall);
     attatchEventListenersToCueBall();
     // console.log(cueBall, table, svgLayer);
 }

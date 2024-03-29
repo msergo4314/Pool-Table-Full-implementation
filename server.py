@@ -24,7 +24,7 @@ def remove_video(video_file_name: str = output_name, extension: str = extension)
 def make_default_table() -> Physics.Table:
     
     def millimeter_offset() -> float:
-        return 14.0
+        return 16.0
     
     # Setup the table
     table_to_return = Physics.Table()  # Create a new table
@@ -137,7 +137,7 @@ class ServerGame(Physics.Game):
         self.sunk_balls : list[int] = []
         # Starting table is the largest tableID but this is not true if the game is loaded from the db
         self.starting_table_ID : int = self.get_total_number_of_tables_in_database()
-        print(self.starting_table_ID)
+        print("Starting table ID: " + str(self.starting_table_ID))
         # exclude the 8 ball and the cue ball from both lists
         # use lists not a tuple because the lists will be shortened as the game progresses
         self.high_balls = [i for i in range(9, 16)]
@@ -186,7 +186,7 @@ class ServerGame(Physics.Game):
             self.most_recent_table += Physics.StillBall(0, Physics.Coordinate(Physics.TABLE_WIDTH / 2.0, Physics.TABLE_LENGTH - Physics.TABLE_WIDTH / 2.0))
         if not self.extra_turn and not self.winner:
             self.switch_current_player()
-        self.current_cursor.commit()
+        self.database.current_database_connection.commit()
         return tuple(svg_list)
     
     def analyze_segments(self, segments : tuple[Physics.Table]) -> None:
@@ -660,6 +660,7 @@ def main() -> None:
     #     sys.exit(1)  # Exit the script
     
     if "reset" in sys.argv:
+        print("Reset the database")
         temp = Physics.Database(reset=True)
         temp.close()
         del temp
