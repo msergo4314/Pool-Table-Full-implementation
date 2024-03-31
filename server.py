@@ -7,12 +7,12 @@ import sys
 from subprocess import run, CalledProcessError, DEVNULL
 from time import perf_counter
 
+# used only for videos and svg files (testing only)
 NUM_PADDED_ZEROES = 5
 extension = "webm"
 output_name = "svg_movie"
 # web server imports
 from http.server import HTTPServer, BaseHTTPRequestHandler
-# from icecream import ic # for debugging
 # used to parse the URL and extract form data for GET requests
 from urllib.parse import urlparse, parse_qsl, parse_qs
 
@@ -24,7 +24,7 @@ def remove_video(video_file_name: str = output_name, extension: str = extension)
 def make_default_table() -> Physics.Table:
     
     def millimeter_offset() -> float:
-        return 16.0
+        return 10.0
     
     # Setup the table
     table_to_return = Physics.Table()  # Create a new table
@@ -134,14 +134,14 @@ class ServerGame(Physics.Game):
         self.eight_ball_sunk_invalid : bool = False
         self.eight_ball_sunk_valid : bool = False
         self.winner : str = None
-        self.sunk_balls : list[int] = []
         # Starting table is the largest tableID but this is not true if the game is loaded from the db
         self.starting_table_ID : int = self.get_total_number_of_tables_in_database()
         print("Starting table ID: " + str(self.starting_table_ID))
         # exclude the 8 ball and the cue ball from both lists
         # use lists not a tuple because the lists will be shortened as the game progresses
-        self.high_balls = [i for i in range(9, 16)]
-        self.low_balls = [i for i in range(1, 8)]
+        self.high_balls : list[int] = [i for i in range(9, 16)]
+        self.low_balls : list[int] = [i for i in range(1, 8)]
+        self.sunk_balls : list[int] = [] # no sunk balls at start of game
         print(f"NEW ID: {self.game_ID}")
         self.open_cursor()
         return
@@ -282,7 +282,7 @@ class ServerGame(Physics.Game):
         # self.close()
         return
 
-    def high_balls_svg(self) -> str:
+    def balls_svg(self, list_of_balls : list[int]) -> str:
         # Define rectangle dimensions
         rect_width = ServerGame.SVG_BALL_DISPLAY_X
         rect_height = ServerGame.SVG_BALL_DISPLAY_Y
@@ -297,70 +297,11 @@ class ServerGame(Physics.Game):
         svg_string += f'<rect x="0" y="0" width="{rect_width}" height="{rect_height}" fill="none"/>'
 
         # Calculate spacing for circles
-        num_high_balls = len(self.high_balls)
+        num_high_balls = len(list_of_balls)
         circle_spacing = rect_width / (num_high_balls + 1)
         
         # Add circles for high balls
-        for i, ball_number in enumerate(self.high_balls):
-            cx = circle_spacing * (i + 1)
-            cy = rect_height / 2
-            # Add main colored circle for the ball itself
-            svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS}" fill="{Physics.BALL_COLOURS[ball_number]}" />'
-            # Add smaller white circle for ball number
-            svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS/2}" fill="white" />'
-            # Add text inside the white circle
-            svg_string += f'<text x="{cx}" y="{cy + 4}" text-anchor="middle" alignment-baseline="middle" fill="black" font-size="{Physics.BALL_RADIUS/2}px" font-weight="bold">{ball_number}</text>'
-            
-        svg_string += '</svg>'
-        return svg_string
-
-    def low_balls_svg(self) -> str:
-        rect_width = ServerGame.SVG_BALL_DISPLAY_X
-        rect_height = ServerGame.SVG_BALL_DISPLAY_Y
-        svg_string = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-                        <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
-                        "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-                        <svg width="{rect_width}" height="{rect_height}"
-                        xmlns="http://www.w3.org/2000/svg"
-                        xmlns:xlink="http://www.w3.org/1999/xlink">"""
-        svg_string += f'<rect x="0" y="0" width="{rect_width}" height="{rect_height}" fill="none"/>'
-        # Calculate spacing for circles
-        num_low_balls = len(self.low_balls)
-        circle_spacing = rect_width / (num_low_balls + 1)
-        # Add circles for high balls
-        for i, ball_number in enumerate(self.low_balls):
-            cx = circle_spacing * (i + 1)
-            cy = rect_height / 2
-            # Add main colored circle for the ball itself
-            svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS}" fill="{Physics.BALL_COLOURS[ball_number]}" />'
-            # Add smaller white circle for ball number
-            svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS/2}" fill="white" />'
-            # Add text inside the white circle
-            svg_string += f'<text x="{cx}" y="{cy + 4}" text-anchor="middle" alignment-baseline="middle" fill="black" font-size="{Physics.BALL_RADIUS/2}px" font-weight="bold">{ball_number}</text>'
-            
-        svg_string += '</svg>'
-        return svg_string
-
-    def sunk_balls_svg(self) -> str:
-        # Define rectangle dimensions
-        rect_width = ServerGame.SVG_BALL_DISPLAY_X
-        rect_height = ServerGame.SVG_BALL_DISPLAY_Y
-        
-        # Start SVG string with rectangle
-        svg_string = f"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-                        <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
-                        "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-                        <svg width="{rect_width}" height="{rect_height}"
-                        xmlns="http://www.w3.org/2000/svg"
-                        xmlns:xlink="http://www.w3.org/1999/xlink">"""
-        svg_string += f'<rect x="0" y="0" width="{rect_width}" height="{rect_height}" fill="none"/>'
-
-        # Calculate spacing for circles
-        num_high_balls = len(self.sunk_balls)
-        circle_spacing = rect_width / (num_high_balls + 1)
-        
-        # Add circles for high balls
-        for i, ball_number in enumerate(self.sunk_balls):
+        for i, ball_number in enumerate(list_of_balls):
             cx = circle_spacing * (i + 1)
             cy = rect_height / 2
             # Add main colored circle for the ball itself
@@ -606,12 +547,12 @@ class MyHandler(BaseHTTPRequestHandler):
                                     {self.box('<div class="infoBoxLeadingText">Player Two: </div>' + player_two)}
                                     {self.box('<div class="infoBoxLeadingText">Table time: </div>' + str(round(current_table.time, 2)), ID="time")}
                                     {self.box(f'<div class="infoBoxLeadingText">Player one score: </div>{str(score_1)} {get_style_text(score_1)}', ID="p1score")}
-                                    {self.box(f'<div class="infoBoxLeadingText">Player two score: </div>{str(score_2)} {get_style_text(score_2)}', ID="p2score")}
+                                    {self.box(f'<div class=" infoBoxLeadingText">Player two score: </div>{str(score_2)} {get_style_text(score_2)}', ID="p2score")}
                                     {self.box('<div class="infoBoxLeadingText">Current Player: </div>' + current_game.current_player)}
                                     {self.box('<div class="infoBoxLeadingText">Current Shot Speed: </div>N/A', ID="speedBox")}
-                                    {self.box('<div class="infoBoxLeadingText">Current LOW balls: </div>' + current_game.low_balls_svg())}
-                                    {self.box('<div class="infoBoxLeadingText">Current HIGH balls: </div>' + current_game.high_balls_svg())}
-                                    {self.box('<div class="infoBoxLeadingText">Sunk balls: </div>' + current_game.sunk_balls_svg())}
+                                    {self.box('<div class="infoBoxLeadingText">Current LOW balls: </div>' + current_game.balls_svg(current_game.low_balls))}
+                                    {self.box('<div class="infoBoxLeadingText">Current HIGH balls: </div>' + current_game.balls_svg(current_game.high_balls))}
+                                    {self.box('<div class="infoBoxLeadingText">Sunk balls: </div>' + current_game.balls_svg(current_game.sunk_balls))}
                                 </div> <!--for outer info box-->
                                 </div> <!---for column 1-->
                                 <div class="column">

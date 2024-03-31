@@ -45,6 +45,7 @@ form{
     color: rgb(255, 255, 255);
     /* font-family: "MV boli"; */
     font-family: "Times New Roman";
+    font-weight: bold;
     background-color: rgb(124, 123, 123);
     font-size: 2.1rem;
     margin: 0px 0px 10px 0px;
@@ -117,7 +118,7 @@ button:hover{
     position: relative;
 }
 svg {
-    max-height: 100vh;
+    max-height: 110vh;
     /* max-width: 100%; Set maximum width to 100% of its container's width */
     height: auto;
     width: auto;

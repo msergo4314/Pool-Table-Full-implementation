@@ -1,9 +1,13 @@
 import phylib
 from typing import Union
+from time import perf_counter
+from math import hypot, floor
 # other libraries imported later: sqlite3, math, os, time
 
 ################################################################################
 # header and footer for svg function
+
+SHOW_BALL_NUMBERS_ON_TABLE : bool = False
 
 HEADER = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
@@ -85,9 +89,13 @@ class StillBall(phylib.phylib_object):
 
     # add an svg method here
     def svg(self):
-        # add ID ballnumbers
-        return""" <circle cx="%d" cy="%d" r="%d" fill="%s" />\n""" % (self.obj.still_ball.pos.x, self.obj.still_ball.pos.y,\
-        BALL_RADIUS, BALL_COLOURS[self.obj.still_ball.number])
+        cx: int = self.obj.still_ball.pos.x
+        cy: int = self.obj.still_ball.pos.y
+        svg_str: str = f"""<circle cx="{cx}" cy="{cy}" r="{BALL_RADIUS}" fill="{BALL_COLOURS[self.obj.still_ball.number]}" />\n"""
+        if self.obj.still_ball.number and SHOW_BALL_NUMBERS_ON_TABLE:
+            svg_str += f"""<circle cx="{cx}" cy="{cy}" r="{BALL_RADIUS/2}" fill="white" />\n"""
+            svg_str += f"""<text x="{cx}" y="{cy + 4}" text-anchor="middle" alignment-baseline="middle" fill="black" font-size="{BALL_RADIUS/2}px" font-weight="bold" pointer-events="none">{self.obj.still_ball.number}</text>"""
+        return svg_str
 
 ################################################################################
 class RollingBall(phylib.phylib_object):
@@ -112,8 +120,13 @@ class RollingBall(phylib.phylib_object):
 
     # add an svg method here
     def svg(self):
-        return """ <circle cx="%d" cy="%d" r="%d" fill="%s" />\n""" % (self.obj.rolling_ball.pos.x,self.obj.rolling_ball.pos.y,\
-        BALL_RADIUS, BALL_COLOURS[self.obj.rolling_ball.number])
+        cx: int = self.obj.still_ball.pos.x
+        cy: int = self.obj.still_ball.pos.y
+        svg_str: str = f"""<circle cx="{cx}" cy="{cy}" r="{BALL_RADIUS}" fill="{BALL_COLOURS[self.obj.rolling_ball.number]}" />\n"""
+        if self.obj.rolling_ball.number and SHOW_BALL_NUMBERS_ON_TABLE:
+            svg_str += f"""<circle cx="{cx}" cy="{cy}" r="{BALL_RADIUS/2}" fill="white" />\n"""
+            svg_str += f"""<text x="{cx}" y="{cy + 4}" text-anchor="middle" alignment-baseline="middle" fill="black" font-size="{BALL_RADIUS/2}px" font-weight="bold" pointer-events="none">{self.obj.rolling_ball.number}</text>"""
+        return svg_str
 
 ################################################################################
 class Hole(phylib.phylib_object):
@@ -198,8 +211,6 @@ class Table(phylib.phylib_table):
     """
     Pool table class.
     """
-    
-    from math import sqrt, hypot
     
     def __init__(self):
         """
@@ -637,12 +648,10 @@ class Game:
             print("CUE BALL OR SHOT ID ARE FALSY")
             return
         cue_ball = self.set_cue_ball(cue_ball, xvel, yvel)
-        from math import floor
         list_of_segments : list[Table] = []
         table_ID_list : list[int] = []
         # self.open_cursor()
         count = 0
-        from time import perf_counter
         start = perf_counter()
         while table:
             count += 1
@@ -659,7 +668,7 @@ class Game:
             table_ID_list.append(Game.database.writeTable(current_segment)  + 1)
             list_of_segments.append(current_segment)
             table = current_segment
-            if count == 600:
+            if count == 5000:
                 print(f"TOO MANY SEGMENTS -- ENTERING INFINITE LOOP -- (COUNTED {count} SEGMENTS). ABORTING SHOOT")
                 print("SHOT PARAMS: ", xvel, yvel)
                 # print("CURRENT SEGMENT:", str(current_segment), sep='\n')
@@ -709,7 +718,7 @@ class Game:
         Game.database.close()
         return
     
-    def get_number_of_tables_for_shot(self, shot_ID : int) -> Table:
+    def get_number_of_tables_for_shot(self, shot_ID : int) -> int:
         self.open_cursor()
         num_shots = Game.current_cursor.execute("SELECT COUNT(t.TABLEID) FROM (TableShot as t INNER JOIN SHOT\
                                                 as s ON (t.SHOTID = s.SHOTID)) WHERE s.GAMEID = ? and s.SHOTID = ?;", (self.game_ID, shot_ID)).fetchone()[0]
@@ -722,7 +731,7 @@ class Game:
         self.close_cursor()
         return x
 
-    def get_most_recent_shotID(self):
+    def get_most_recent_shotID(self) -> int:
         self.open_cursor()
         x = Game.current_cursor.execute("SELECT COALESCE(MAX(s.SHOTID), 0) FROM Shot as s\
             INNER JOIN TableShot as ts on (ts.SHOTID = s.SHOTID) WHERE s.GAMEID = ?;", (self.game_ID,)).fetchone()[0]
@@ -745,7 +754,6 @@ class Game:
 
 ################################################################################    
 def get_acceleration_coordinates(rolling_ball_dx: float, rolling_ball_dy: float) -> Coordinate:
-    from math import hypot
     rolling_ball_a_x, rolling_ball_a_y = 0.0, 0.0
     rolling_ball_speed = hypot(rolling_ball_dx, rolling_ball_dy)
     if (rolling_ball_speed > VEL_EPSILON):

@@ -230,11 +230,11 @@ double phylib_dot_product(phylib_coord b, phylib_coord a) {
 double phylib_distance(phylib_object *obj1, phylib_object *obj2) {
     if (obj1 == NULL || obj2 == NULL) {
         // printf("One or both of the objects are NULL\n");
-        return -2.0;
+        return -20.0;
     }
     if (obj1->type != PHYLIB_ROLLING_BALL) {
         // printf("Object one MUST be a rolling ball!\n");
-        return -1.0;
+        return -10.0;
     }
     switch(obj2->type) {
         case PHYLIB_ROLLING_BALL: // should be able to merge the first two cases but no need to risk it
@@ -261,7 +261,7 @@ void phylib_roll(phylib_object *new, phylib_object *old, double time) {
     if (new == NULL || old == NULL) {
         return; // do nothing if both are not rolling balls
     }
-    if (new->type !=  PHYLIB_ROLLING_BALL|| old->type != PHYLIB_ROLLING_BALL) {
+    if (new->type !=  PHYLIB_ROLLING_BALL || old->type != PHYLIB_ROLLING_BALL) {
         return;
     }
     double position_old_x = old->obj.rolling_ball.pos.x;
@@ -442,7 +442,7 @@ phylib_table *phylib_segment(phylib_table *table) {
             for (int i = 0; i < PHYLIB_MAX_OBJECTS; i++) {
                 if (new_table->object[i] && new_table->object[i]->type == PHYLIB_ROLLING_BALL) {
                     for(int j = 0; j < PHYLIB_MAX_OBJECTS; j++) {
-                        if ((new_table->object)[i] != NULL && (new_table->object)[j] != NULL && j != i && (new_table->object)[i]->type == PHYLIB_ROLLING_BALL) {
+                        if ((new_table->object)[j] != NULL && j != i) {
                             if (phylib_distance((new_table->object)[i], (new_table->object)[j]) < 0.0) {
                                 phylib_bounce(&((new_table->object)[i]), &((new_table->object)[j]));
                                 goto function_exit;

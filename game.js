@@ -148,7 +148,6 @@ function setup() {
     addEventListenersToTable();
     svgLayer = document.getElementById("svgLayer"); // hidden layer that goes above the pool table
     attatchEventListenersToCueBall();
-    // console.log(cueBall, table, svgLayer);
 }
 
 function addEventListenersToTable() {
@@ -218,6 +217,7 @@ function sendShotData(shotData) {
 
 async function handleShotData(shotData) {
     try {
+        // send the data, wait for request to get response text
         const TextData = await sendShotData(shotData);
         var svgData = TextData.split('\n\n'); // Split by double newline characters
         // console.log(svgData.length)
@@ -294,11 +294,14 @@ function refreshPage() {
 
 function getMouseFromSVG(screenSVGLayer) {
     // Return absolute mouse coordinates
+    // const cueBall_x = cueBallBoundingRectangle.left
+    // const cueBall_y = cueBallBoundingRectangle.top
     const cueBall_x = cueBallBoundingRectangle.left + (cueBallBoundingRectangle.width / 2);
     const cueBall_y = cueBallBoundingRectangle.top + (cueBallBoundingRectangle.height / 2);
-
+    
+    console.log("CUEBALL X Y:", cueBall_x, cueBall_y);
+    console.log("CUEBALL RECT:", cueBallBoundingRectangle);
     const mouseX = cueBall_x - screenSVGLayer.getBoundingClientRect().left;
     const mouseY = cueBall_y - screenSVGLayer.getBoundingClientRect().top;
-
     return { x: mouseX, y: mouseY };
 }
