@@ -151,7 +151,7 @@ class ServerGame(Physics.Game):
         self.current_player = self.player2_name if self.current_player == self.player1_name else self.player1_name
         return
 
-    def perform_shot(self, x_vel, y_vel) -> tuple[tuple[str]]:
+    def perform_shot(self, x_vel, y_vel) -> tuple[tuple[str, float]]:
         self.num_shots_made += 1
         self.cue_ball_sunk = False
         self.extra_turn = False

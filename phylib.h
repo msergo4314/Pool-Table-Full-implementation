@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 // all the constants (subject to changes)
+#define PHYLIB_FRAME_INTERVAL (0.01) // frame rate of the simulation (100 svgs/sec)
 #define PHYLIB_BALL_RADIUS (28.5) // mm
 #define PHYLIB_BALL_DIAMETER (2 * PHYLIB_BALL_RADIUS)
 #define PHYLIB_HOLE_RADIUS (2 * PHYLIB_BALL_DIAMETER)

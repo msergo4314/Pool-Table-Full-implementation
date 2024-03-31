@@ -22,7 +22,7 @@ FOOTER = """</svg>\n"""
 ################################################################################
 # import constants from phylib to global varaibles (some new constants)
 
-FRAME_INTERVAL = 0.01 # constant frame rate for database operations
+FRAME_INTERVAL = phylib.PHYLIB_FRAME_INTERVAL # constant frame rate for database operations
 BALL_RADIUS    = phylib.PHYLIB_BALL_RADIUS
 BALL_DIAMETER  = phylib.PHYLIB_BALL_DIAMETER
 HOLE_RADIUS    = phylib.PHYLIB_HOLE_RADIUS
