@@ -24,7 +24,7 @@ def remove_video(video_file_name: str = output_name, extension: str = extension)
 def make_default_table() -> Physics.Table:
     
     def millimeter_offset() -> float:
-        return 10.0
+        return 12.0
     
     # Setup the table
     table_to_return = Physics.Table()  # Create a new table
@@ -118,7 +118,7 @@ class ServerGame(Physics.Game):
     def __init__(self, gameName: str=None, player_one: str = None, player_two: str = None, game_ID : int = None):
         from random import random
         super().__init__(gameName=gameName, player1Name=player_one, player2Name=player_two) # call Game class constructor
-        # print(self.game_ID, self.game_Name, self.player1_name, self.player2_name) # inherited from superclass
+        # print(self.game_ID, self.game_name, self.player1_name, self.player2_name) # inherited from superclass
         self.most_recent_table : Physics.Table = make_default_table() # initially the game will have the default table
         self.current_player : str = self.player1_name if random() > 0.5 else self.player2_name
         # the player who is NOT playing
@@ -157,7 +157,7 @@ class ServerGame(Physics.Game):
         self.extra_turn = False
         # perform the shot. Split the current player for when (LOW) or (HIGH) are appended (will not be in db)
         playerName = self.remove_high_low_if_present()
-        segments : tuple[Physics.Table] = super().shoot(gameName=self.game_Name, playerName=playerName,\
+        segments : tuple[Physics.Table] = super().shoot(gameName=self.game_name, playerName=playerName,\
             table=self.most_recent_table, xvel=float(x_vel), yvel=float(y_vel))
         self.analyze_segments(segments) # update scores or end game as needed
         if self.cue_ball_sunk:
@@ -422,7 +422,7 @@ class MyHandler(BaseHTTPRequestHandler):
                 return
             
             response_content = self.generate_display_html(current_game= MyHandler.current_game, \
-                game_name=MyHandler.current_game.game_Name, \
+                game_name=MyHandler.current_game.game_name, \
                 player_one=MyHandler.current_game.player1_name,\
                 player_two=MyHandler.current_game.player2_name)
             self.send_response(200)
@@ -605,6 +605,9 @@ def main() -> None:
         temp = Physics.Database(reset=True)
         temp.close()
         del temp
+        
+    if "show" in sys.argv:
+        Physics.SHOW_BALL_NUMBERS_ON_TABLE = True
     from subprocess import DEVNULL
     remove_video()
     # port_num = int(sys.argv[1]) + int(5e4)

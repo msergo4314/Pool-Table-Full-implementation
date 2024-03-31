@@ -611,7 +611,7 @@ class Game:
         self.open_cursor() # make sure cursor is open
 
         self.game_ID = gameID
-        self.game_Name = gameName
+        self.game_name = gameName
         self.player1_name : str = player1Name
         self.player2_name : str = player2Name
         self.most_recent_shot_ID : int = None

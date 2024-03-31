@@ -151,8 +151,6 @@ void phylib_copy_object(phylib_object **dest, phylib_object **src) {
         *dest = NULL; // set destination to source which is NULL
         return;
     }
-    // even if *src == NULL, memcpy will work
-    // printf("attempting to copy object type %d\n", (*src)->type);
     *dest = (phylib_object*)malloc(sizeof(phylib_object));
     if(*dest == NULL) {
         // printf("malloc failed\n");
@@ -223,7 +221,7 @@ double phylib_length(phylib_coord c) {
     return sqrt(c.x * c.x + c.y * c.y);
 }
 
-double phylib_dot_product(phylib_coord b, phylib_coord a) {
+double phylib_dot_product(phylib_coord a, phylib_coord b) {
     return a.x * b.x + a.y * b.y;
 }
 

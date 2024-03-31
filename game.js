@@ -7,12 +7,10 @@ let SPEEDUP_FACTOR = 2;
 let table = document.getElementById("poolTable");
 let cueBall, cueBallBoundingRectangle;
 let svgLayer = document.getElementById("svgLayer"); // hidden layer that goes above the pool table 
-const shotWidth  = '14'; // how big to make the shot line
 const SCALE_FACTOR = 10;
 const SIM_RATE = 0.01;
-let REFRESH_TIME = 8;
+let REFRESH_TIME = 1;
 let SPEEDUP = false;
-const INDICATOR_FONT_SIZE = '16px';
 const MAX_VEL = 1e4; // max velocity of a shot
 const maxIndicatorLength = 100;
 
@@ -202,7 +200,7 @@ function sendShotData(shotData) {
         xhr.onreadystatechange = function () {
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status == 200) {
-                    console.log('Shot data sent successfully');
+                    // console.log('Shot data sent successfully');
                     resolve(xhr.responseText);
                 } else {
                     console.error('Network response was not ok');
@@ -280,7 +278,7 @@ function refreshPage() {
     const xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
-            // console.log("successful refresh");
+            console.log("successful refresh");
             // Replace the current document body with the fetched HTML content
             document.body.innerHTML = this.responseText;
             // reset all the key elements
@@ -299,8 +297,8 @@ function getMouseFromSVG(screenSVGLayer) {
     const cueBall_x = cueBallBoundingRectangle.left + (cueBallBoundingRectangle.width / 2);
     const cueBall_y = cueBallBoundingRectangle.top + (cueBallBoundingRectangle.height / 2);
     
-    console.log("CUEBALL X Y:", cueBall_x, cueBall_y);
-    console.log("CUEBALL RECT:", cueBallBoundingRectangle);
+    // console.log("CUEBALL X Y:", cueBall_x, cueBall_y);
+    // console.log("CUEBALL RECT:", cueBallBoundingRectangle);
     const mouseX = cueBall_x - screenSVGLayer.getBoundingClientRect().left;
     const mouseY = cueBall_y - screenSVGLayer.getBoundingClientRect().top;
     return { x: mouseX, y: mouseY };
