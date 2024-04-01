@@ -118,7 +118,7 @@ button:hover{
     position: relative;
 }
 svg {
-    max-height: 110vh;
+    max-height: 100vh;
     /* max-width: 100%; Set maximum width to 100% of its container's width */
     height: auto;
     width: auto;
