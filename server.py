@@ -605,7 +605,12 @@ def main() -> None:
         temp = Physics.Database(reset=True)
         temp.close()
         del temp
-        
+        if os.path.exists(db := Physics.Database.DATABASE_NAME):
+            # remove database file if present
+            os.remove(db)
+    if "reset" in sys.argv:
+        print("exiting early")
+        sys.exit(-1)
     if "show" in sys.argv:
         Physics.SHOW_BALL_NUMBERS_ON_TABLE = True
     from subprocess import DEVNULL
