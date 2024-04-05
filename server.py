@@ -115,9 +115,10 @@ class ServerGame(Physics.Game):
     HIGH_STRING : str = " (HIGH)"
     LOW_STRING : str = " (LOW)"
     
-    def __init__(self, gameName: str=None, player_one: str = None, player_two: str = None, game_ID : int = None):
+    def __init__(self, gameName: str=None, player_one: str = None,
+                 player_two: str = None, game_ID : int = None):
         from random import random
-        super().__init__(gameName=gameName, player1Name=player_one, player2Name=player_two) # call Game class constructor
+        super().__init__(gameName=gameName, player1Name=player_one, player2Name=player_two, gameID=game_ID) # call Game class constructor
         # print(self.game_ID, self.game_name, self.player1_name, self.player2_name) # inherited from superclass
         self.most_recent_table : Physics.Table = make_default_table() # initially the game will have the default table
         self.current_player : str = self.player1_name if random() > 0.5 else self.player2_name
@@ -157,8 +158,10 @@ class ServerGame(Physics.Game):
         self.extra_turn = False
         # perform the shot. Split the current player for when (LOW) or (HIGH) are appended (will not be in db)
         playerName = self.remove_high_low_if_present()
-        segments : tuple[Physics.Table] = super().shoot(gameName=self.game_name, playerName=playerName,\
-            table=self.most_recent_table, xvel=float(x_vel), yvel=float(y_vel))
+        segments : tuple[Physics.Table] = super().shoot(playerName=playerName,
+                                                        table=self.most_recent_table,
+                                                        xvel=float(x_vel),
+                                                        yvel=float(y_vel))
         self.analyze_segments(segments) # update scores or end game as needed
         if self.cue_ball_sunk:
             print("CUE BALL HAS BEEN SUNK")

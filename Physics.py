@@ -738,6 +738,10 @@ class Game:
                                                 as s ON (t.SHOTID = s.SHOTID)) WHERE s.GAMEID = ? and s.SHOTID = ?;", (self.game_ID, shot_ID)).fetchone()[0]
         self.close_cursor()
         return id
+    
+    def __del__(self):
+        self.close()
+        return
 
 ################################################################################    
 def get_acceleration_coordinates(rolling_ball_dx: float, rolling_ball_dy: float) -> Coordinate:

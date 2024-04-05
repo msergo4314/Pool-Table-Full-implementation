@@ -52,10 +52,10 @@ def main():
     
     start1 = perf_counter()
     if special:
-        game.shoot(f"Game {NUM:02}", "Stefan", make_default_table(), 0, -1000)
+        game.shoot("Stefan", make_default_table(), 0, -1000)
     else:
         for i in range(LOOP):
-            game.shoot(game.game_name, game.player1_name if i % 2 == 0 else game.player2_name, make_default_table(), x_rand[i], y_rand[i])
+            game.shoot(game.player1_name if i % 2 == 0 else game.player2_name, make_default_table(), x_rand[i], y_rand[i])
             print(f"VEL: {x_rand[i]}, {y_rand[i]}\n")
             
     # print("SPECIAL CASE")
