@@ -117,10 +117,10 @@ class ServerGame(Physics.Game):
     
     def __init__(self, gameName: str=None, player_one: str = None,
                  player_two: str = None, game_ID : int = None):
-        from random import random
         super().__init__(gameName=gameName, player1Name=player_one, player2Name=player_two, gameID=game_ID) # call Game class constructor
         # print(self.game_ID, self.game_name, self.player1_name, self.player2_name) # inherited from superclass
         self.most_recent_table : Physics.Table = make_default_table() # initially the game will have the default table
+        from random import random
         self.current_player : str = self.player1_name if random() > 0.5 else self.player2_name
         # the player who is NOT playing
         self.other_player : str = self.player1_name if self.current_player == self.player2_name else self.player2_name
@@ -143,7 +143,6 @@ class ServerGame(Physics.Game):
         self.high_balls : list[int] = [i for i in range(9, 16)]
         self.low_balls : list[int] = [i for i in range(1, 8)]
         self.sunk_balls : list[int] = [] # no sunk balls at start of game
-        print(f"NEW ID: {self.game_ID}")
         self.open_cursor()
         return
     
@@ -174,13 +173,12 @@ class ServerGame(Physics.Game):
         self.open_cursor()
         for i in range(self.starting_table_ID, largest_table_ID):
             table = self.database.readTable(i)
-            # write_svg(i, table)
-            if table == None:
+            if table is None:
                 print(f"TABLE WITH TABLEID of {i} IS NONE")
+                sys.exit(-1)
             svg_list.append((table.svg(), table.time))
         print(f"time to do all readings: {perf_counter() - start}")
         self.starting_table_ID = self.get_last_tableID_for_shot(self.get_most_recent_shotID())
-        print(f"max shot changed to {self.starting_table_ID}")
         self.open_cursor()
         self.most_recent_table = self.database.readTable(self.starting_table_ID - 1)
         # print(self.most_recent_table)
@@ -189,6 +187,7 @@ class ServerGame(Physics.Game):
             self.most_recent_table += Physics.StillBall(0, Physics.Coordinate(Physics.TABLE_WIDTH / 2.0, Physics.TABLE_LENGTH - Physics.TABLE_WIDTH / 2.0))
         if not self.extra_turn and not self.winner:
             self.switch_current_player()
+        self.close_cursor()
         self.database.current_database_connection.commit()
         return tuple(svg_list)
     
@@ -603,7 +602,11 @@ def main() -> None:
     #     # need to use exit instead of return
     #     sys.exit(1)  # Exit the script
     
-    if "reset" in sys.argv:
+    if any(arg in ('-h', '--help') for arg in sys.argv):
+        print("Usage: python3.11 server.py --reset (resets the database) --show-nums (indicates if pool balls show numbers)")
+        sys.exit(0)
+    
+    if any(arg in ('-r', '--reset') for arg in sys.argv):
         print("Reset the database")
         temp = Physics.Database(reset=True)
         temp.close()
@@ -611,13 +614,8 @@ def main() -> None:
         if os.path.exists(db := Physics.Database.DATABASE_NAME):
             # remove database file if present
             os.remove(db)
-    if "reset" in sys.argv:
-        print("exiting early")
-        sys.exit(-1)
-    if "show" in sys.argv:
+    if any(arg in ('-s', '--show-nums') for arg in sys.argv):
         Physics.SHOW_BALL_NUMBERS_ON_TABLE = True
-    from subprocess import DEVNULL
-    remove_video()
     # port_num = int(sys.argv[1]) + int(5e4)
     port_num = 3000
     # d is for daemon
@@ -629,7 +627,6 @@ def main() -> None:
     except KeyboardInterrupt:
         print('\nCanceled with Ctrl + C')
         httpd.shutdown()
-        # MyHandler.current_game.close()
 
 if __name__ == "__main__":
     main()

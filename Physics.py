@@ -368,20 +368,29 @@ class Database:
         def create_index_if_not_exists(cursor, index_name : str, table_name : str, column_name : str):
             if cursor is None:
                 return
-            cursor.execute(f"SELECT name FROM sqlite_master WHERE type='index' AND name='{index_name}'")
-            result = cursor.fetchone()
+            result = cursor.execute(f"SELECT name FROM sqlite_master WHERE type='index' AND name='{index_name}'").fetchone()
             if result is None:
                 cursor.execute(f"CREATE INDEX {index_name} ON {table_name} ({column_name})")
             return
         
         # need to create each table if it does not exist
         self.open_cursor()
-        table_names = ("Ball", "TTable", "BallTable", "Shot", "TableShot", "Game", "Player")
-        for current_table in table_names:
-            # make sure table exists. If not, create it
-            current_data = Database.current_cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name = '{current_table}';").fetchone()
-            if current_data is None:
-                self.create_DB_table(current_table)
+        table_dictionary = {'Ball'      : "BALLID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, BALLNO INTEGER NOT NULL, \
+                                    XPOS FLOAT NOT NULL, YPOS FLOAT NOT NULL, XVEL FLOAT, YVEL FLOAT",
+                    'TTable'    : "TABLEID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, TIME FLOAT NOT NULL",
+                    'BallTable' : "BALLID INTEGER NOT NULL, TABLEID INTEGER NOT NULL, FOREIGN KEY (BALLID) REFERENCES Ball(BALLID), \
+                                    FOREIGN KEY (TABLEID) REFERENCES TTable(TABLEID)",
+                    'Shot'      : "SHOTID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, PLAYERID INTEGER NOT NULL, \
+                                    GAMEID INTEGER NOT NULL, FOREIGN KEY (GAMEID) REFERENCES Game(GAMEID), \
+                                    FOREIGN KEY (PLAYERID) REFERENCES Player(PLAYERID) ",
+                    'TableShot' : "TABLEID INTEGER NOT NULL, SHOTID INTEGER NOT NULL, FOREIGN KEY (TABLEID) REFERENCES TTable(TABLEID), \
+                                    FOREIGN KEY (SHOTID) REFERENCES Shot(SHOTID)",
+                    'Game'      : "GAMEID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, GAMENAME VARCHAR(64) NOT NULL",
+                    'Player'    : "PLAYERID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, GAMEID INTEGER NOT NULL, PLAYERNAME VARCHAR(64) NOT NULL, \
+                                    FOREIGN KEY (GAMEID) REFERENCES Game(GAMEID)"}
+        
+        for (key, value) in table_dictionary.items():
+            Database.current_cursor.execute(f"CREATE TABLE IF NOT EXISTS {key} ({value});")
         
         # will definitely want these two
         # Database.current_cursor.execute("CREATE INDEX BallTable_BALLID_idx ON BallTable (BALLID);") # speeds up writes (shoot method)
@@ -398,29 +407,6 @@ class Database:
         create_index_if_not_exists(Database.current_cursor, "TableShot_SHOTID_idx", "TableShot", "SHOTID")
         Database.current_database_connection.commit()
         self.close_cursor()
-        return
-
-    def create_DB_table(self, table_name_to_create):
-        # creates the table that is passed in as name_to_create
-        table_names = ("Ball", "TTable", "BallTable", "Shot", "TableShot", "Game", "Player")
-        if not table_name_to_create in table_names:
-            return
-        table_dictionary = {'Ball'      : "BALLID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, BALLNO INTEGER NOT NULL, \
-                                           XPOS FLOAT NOT NULL, YPOS FLOAT NOT NULL, XVEL FLOAT, YVEL FLOAT",
-                            'TTable'    : "TABLEID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, TIME FLOAT NOT NULL",
-                            'BallTable' : "BALLID INTEGER NOT NULL, TABLEID INTEGER NOT NULL, FOREIGN KEY (BALLID) REFERENCES Ball(BALLID), \
-                                           FOREIGN KEY (TABLEID) REFERENCES TTable(TABLEID)",
-                            'Shot'      : "SHOTID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, PLAYERID INTEGER NOT NULL, \
-                                           GAMEID INTEGER NOT NULL, FOREIGN KEY (GAMEID) REFERENCES Game(GAMEID), \
-                                            FOREIGN KEY (PLAYERID) REFERENCES Player(PLAYERID) ",
-                            'TableShot' : "TABLEID INTEGER NOT NULL, SHOTID INTEGER NOT NULL, FOREIGN KEY (TABLEID) REFERENCES TTable(TABLEID), \
-                                           FOREIGN KEY (SHOTID) REFERENCES Shot(SHOTID)",
-                            'Game'      : "GAMEID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, GAMENAME VARCHAR(64) NOT NULL",
-                            'Player'    : "PLAYERID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, GAMEID INTEGER NOT NULL, PLAYERNAME VARCHAR(64) NOT NULL, \
-                                           FOREIGN KEY (GAMEID) REFERENCES Game(GAMEID)"}
-        Database.current_cursor.execute(f"CREATE TABLE \"{table_name_to_create}\" (\
-                                     {table_dictionary.get(table_name_to_create)}\
-                                     );")
         return
 
     def readTable(self, tableID):
