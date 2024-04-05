@@ -39,12 +39,11 @@ def main():
     if "reset" in sys.argv:
         print("resetting db")
         db = Physics.Database(reset=True)
-        db.close()
         del db
     game = Physics.Game(gameName=f"Game {NUM:02}", player1Name="Stefan", player2Name="Efren Reyes")
     special = True if len(sys.argv) > 2 else False
     RANGE = 7000
-    LOOP = 100
+    LOOP = 50
     x_rand = [round(random.uniform(RANGE/2, RANGE), 4) for i in range(LOOP)]
     y_rand = [round(random.uniform(RANGE/2, RANGE), 4) for i in range(LOOP)]
     
@@ -56,7 +55,7 @@ def main():
         game.shoot(f"Game {NUM:02}", "Stefan", make_default_table(), 0, -1000)
     else:
         for i in range(LOOP):
-            game.shoot(game.game_Name, game.player1_name if i % 2 == 0 else game.player2_name, make_default_table(), x_rand[i], y_rand[i])
+            game.shoot(game.game_name, game.player1_name if i % 2 == 0 else game.player2_name, make_default_table(), x_rand[i], y_rand[i])
             print(f"VEL: {x_rand[i]}, {y_rand[i]}\n")
             
     # print("SPECIAL CASE")
