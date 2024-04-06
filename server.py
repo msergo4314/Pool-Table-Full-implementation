@@ -157,19 +157,21 @@ class ServerGame(Physics.Game):
         self.extra_turn = False
         # perform the shot. Split the current player for when (LOW) or (HIGH) are appended (will not be in db)
         playerName = self.remove_high_low_if_present()
+        start = perf_counter()
         segments : tuple[Physics.Table] = super().shoot(playerName=playerName,
                                                         table=self.most_recent_table,
                                                         xvel=float(x_vel),
                                                         yvel=float(y_vel))
+        print(f'Time to shoot: {perf_counter() - start}')
         self.analyze_segments(segments) # update scores or end game as needed
-        if self.cue_ball_sunk:
-            print("CUE BALL HAS BEEN SUNK")
+        # if self.cue_ball_sunk:
+            # print("CUE BALL HAS BEEN SUNK")
         # num_tables = super().get_number_of_tables_for_shot(start + 1) # this will go from 1 - num_tables
         largest_table_ID = self.get_last_tableID_for_shot(self.get_most_recent_shotID())
-        print(f"previous max shot index: {self.starting_table_ID}")
+        # print(f"previous max shot index: {self.starting_table_ID}")
         svg_list = []
         start = perf_counter()
-        print(f"using i range: ({self.starting_table_ID} - {largest_table_ID})")
+        # print(f"using i range: ({self.starting_table_ID} - {largest_table_ID})")
         self.open_cursor()
         for i in range(self.starting_table_ID, largest_table_ID):
             table = self.database.readTable(i)
@@ -206,11 +208,11 @@ class ServerGame(Physics.Game):
                                 (self.current_player.endswith(ServerGame.HIGH_STRING) and len(self.high_balls) == 0):
                                 # case for only cue ball and 8 ball
                                 self.winner = self.remove_high_low_if_present()
-                                print("VALID 8 BALL SUNK")
+                                # print("VALID 8 BALL SUNK")
                             else:
                                 # should immediately end the game and make current player the loser
                                 self.winner = self.remove_high_low_if_present(player=self.other_player)
-                                print("INVALID 8 BALL SUNK")
+                                # print("INVALID 8 BALL SUNK")
                             return
                         if previous_ball == 0:
                             self.cue_ball_sunk = True
@@ -218,11 +220,11 @@ class ServerGame(Physics.Game):
                         # if the HIGH/LOW was not yet set (can only happen once)
                         if self.set_high_low is False:
                             if previous_ball in self.low_balls:
-                                print(f"SETTING CURRENT PLAYER {self.current_player} LOW -- ball {previous_ball} was sunk")
+                                # print(f"SETTING CURRENT PLAYER {self.current_player} LOW -- ball {previous_ball} was sunk")
                                 self.set_high_low_values(ServerGame.LOW_STRING)
                                 self.low_balls.remove(previous_ball)
                             else:
-                                print(f"SETTING CURRENT PLAYER {self.current_player} HIGH -- ball {previous_ball} was sunk")
+                                # print(f"SETTING CURRENT PLAYER {self.current_player} HIGH -- ball {previous_ball} was sunk")
                                 self.set_high_low_values(ServerGame.HIGH_STRING)
                                 self.high_balls.remove(previous_ball)
                             self.extra_turn = True
@@ -230,24 +232,24 @@ class ServerGame(Physics.Game):
                             continue
                         
                         else:
-                            print(self.current_player, previous_ball)
+                            # print(self.current_player, previous_ball)
                             if (self.current_player.endswith(ServerGame.LOW_STRING) and previous_ball in self.low_balls):
                                 self.low_balls.remove(previous_ball)
-                                print(f"LOW BALL {previous_ball} was sunk")
+                                # print(f"LOW BALL {previous_ball} was sunk")
                                 self.increase_player_score()
                                 self.extra_turn = True
                             elif (self.current_player.endswith(ServerGame.HIGH_STRING) and previous_ball in self.high_balls):
                                 self.high_balls.remove(previous_ball)
-                                print(f"HIGH BALL {previous_ball} was sunk")
+                                # print(f"HIGH BALL {previous_ball} was sunk")
                                 self.increase_player_score()
                                 self.extra_turn = True
                             elif (self.current_player.endswith(ServerGame.LOW_STRING) and previous_ball in self.high_balls):
                                 self.high_balls.remove(previous_ball)
-                                print(f"HIGH BALL {previous_ball} was sunk")
+                                # print(f"HIGH BALL {previous_ball} was sunk")
                                 self.increase_player_score(self.other_player)
                             elif (self.current_player.endswith(ServerGame.HIGH_STRING) and previous_ball in self.low_balls):
                                 self.low_balls.remove(previous_ball)
-                                print(f"LOW BALL {previous_ball} was sunk")
+                                # print(f"LOW BALL {previous_ball} was sunk")
                                 self.increase_player_score(self.other_player)
                             self.sunk_balls.append(previous_ball)
             previous_balls = segment_balls
@@ -257,10 +259,10 @@ class ServerGame(Physics.Game):
             # have to do it at runtime
             player_to_increment_score = self.current_player
         if self.player1_name.split(maxsplit=1)[0] in player_to_increment_score:
-            print("incremented p1")
+            # print("incremented p1")
             self.player_1_score += 1
         elif self.player2_name.split(maxsplit=1)[0] in player_to_increment_score:
-            print("incremented p2")
+            # print("incremented p2")
             self.player_2_score += 1
         return    
         

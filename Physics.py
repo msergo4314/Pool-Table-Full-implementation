@@ -2,7 +2,6 @@ import phylib
 from typing import Union
 from time import perf_counter
 from math import hypot, floor
-# other libraries imported later: sqlite3, math, os, time
 
 ################################################################################
 # header and footer for svg function
@@ -409,20 +408,47 @@ class Database:
         self.close_cursor()
         return
 
+    # def readTable(self, tableID):
+    #     if not isinstance(tableID, int):
+    #         return None
+    #     # self.open_cursor()
+    #     balls_in_table = Database.current_cursor.execute(f"""SELECT b.BALLNO, b.XPOS, b.YPOS, b.XVEL, b.YVEL, t.TIME
+    #             FROM Ball AS b JOIN BallTable AS bt
+    #             ON b.BALLID = bt.BALLID JOIN TTable AS t
+    #             ON bt.TABLEID = t.TABLEID
+    #             WHERE bt.TABLEID = {tableID + 1}""").fetchall() # inner join is default join
+        
+    #     if not balls_in_table:
+    #         return None
+    #     table_to_return = Table() # create a table object
+    #     table_to_return.time = balls_in_table[len(balls_in_table) - 1][5]
+
+    #     for current_ball in balls_in_table:
+    #         if current_ball[3] is None and current_ball[4] is None:
+    #             new_ball = StillBall(current_ball[0], Coordinate(current_ball[1], current_ball[2]))
+    #         else:
+    #             # new_ball = StillBall(current_ball[0], Coordinate(current_ball[1], current_ball[2]))
+    #             new_ball = RollingBall(current_ball[0], Coordinate(current_ball[1], current_ball[2]), Coordinate(current_ball[3], current_ball[4]),\
+    #             get_acceleration_coordinates(current_ball[3], current_ball[4]))
+    #         table_to_return += new_ball
+    #     # Database.current_database_connection.commit() # commits are too slow and also this function does not change the actual db
+    #     # self.close_cursor()
+    #     return table_to_return
+
     def readTable(self, tableID):
         if not isinstance(tableID, int):
+            print("readTable must take an integer!")
             return None
         # self.open_cursor()
-        balls_in_table = Database.current_cursor.execute(f"""SELECT b.BALLNO, b.XPOS, b.YPOS, b.XVEL, b.YVEL, t.TIME
+        balls_in_table = Database.current_cursor.execute(f"""SELECT b.BALLNO, b.XPOS, b.YPOS, b.XVEL, b.YVEL
                 FROM Ball AS b JOIN BallTable AS bt
-                ON b.BALLID = bt.BALLID JOIN TTable AS t
-                ON bt.TABLEID = t.TABLEID
+                ON b.BALLID = bt.BALLID
                 WHERE bt.TABLEID = {tableID + 1}""").fetchall() # inner join is default join
         
         if not balls_in_table:
             return None
         table_to_return = Table() # create a table object
-        table_to_return.time = balls_in_table[len(balls_in_table) - 1][5]
+        table_to_return.time = Database.current_cursor.execute("SELECT t.TIME FROM TTable AS T WHERE T.TABLEID = ?;", (tableID + 1,)).fetchone()[0]
 
         for current_ball in balls_in_table:
             if current_ball[3] is None and current_ball[4] is None:
@@ -632,7 +658,6 @@ class Game:
         table_ID_list : list[int] = []
         # self.open_cursor()
         count = 0
-        start = perf_counter()
         while table:
             count += 1
             if (current_segment := table.segment()) is None:
@@ -655,8 +680,7 @@ class Game:
                 return
         table_shot_values = [(table_ID, shot_ID) for table_ID in table_ID_list]
         self.most_recent_shot_ID = shot_ID
-        print(f'Time to shoot: {perf_counter() - start}')
-        print(f'NUMBER OF SEGMENTS: {count}')
+        # print(f'NUMBER OF SEGMENTS: {count}')
         Game.current_cursor.executemany("INSERT INTO TableShot (TABLEID, SHOTID) VALUES (?, ?);", (table_shot_values))
         # self.database.current_database_connection.commit()
         self.close_cursor()
