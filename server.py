@@ -311,10 +311,9 @@ class ServerGame(Physics.Game):
             # Add main colored circle for the ball itself
             svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS}" fill="{Physics.BALL_COLOURS[ball_number]}" />'
             # Add smaller white circle for ball number
-            if Physics.SHOW_BALL_NUMBERS_ON_TABLE:
-                svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS/2}" fill="white" />'
-                # Add text inside the white circle
-                svg_string += f'<text x="{cx}" y="{cy + 4}" text-anchor="middle" alignment-baseline="middle" fill="black" font-size="{Physics.BALL_RADIUS/2}px" font-weight="bold">{ball_number}</text>'
+            svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS/2}" fill="white" />'
+            # Add text inside the white circle
+            svg_string += f'<text x="{cx}" y="{cy + 4}" text-anchor="middle" alignment-baseline="middle" fill="black" font-size="{Physics.BALL_RADIUS/2}px" font-weight="bold">{ball_number}</text>'
             
         svg_string += '</svg>'
         return svg_string
