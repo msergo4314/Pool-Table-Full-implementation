@@ -311,9 +311,10 @@ class ServerGame(Physics.Game):
             # Add main colored circle for the ball itself
             svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS}" fill="{Physics.BALL_COLOURS[ball_number]}" />'
             # Add smaller white circle for ball number
-            svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS/2}" fill="white" />'
-            # Add text inside the white circle
-            svg_string += f'<text x="{cx}" y="{cy + 4}" text-anchor="middle" alignment-baseline="middle" fill="black" font-size="{Physics.BALL_RADIUS/2}px" font-weight="bold">{ball_number}</text>'
+            if Physics.SHOW_BALL_NUMBERS_ON_TABLE:
+                svg_string += f'<circle cx="{cx}" cy="{cy}" r="{Physics.BALL_RADIUS/2}" fill="white" />'
+                # Add text inside the white circle
+                svg_string += f'<text x="{cx}" y="{cy + 4}" text-anchor="middle" alignment-baseline="middle" fill="black" font-size="{Physics.BALL_RADIUS/2}px" font-weight="bold">{ball_number}</text>'
             
         svg_string += '</svg>'
         return svg_string
@@ -321,8 +322,8 @@ class ServerGame(Physics.Game):
     def remove_high_low_if_present(self, player : str = "") -> str:
         if not player:
             player: str = self.current_player
-        low_index = player.find(" (LOW)")
-        high_index = player.find(" (HIGH)")
+        low_index = player.find(ServerGame.LOW_STRING)
+        high_index = player.find(ServerGame.HIGH_STRING)
 
         if low_index != -1 or high_index != -1:
             if low_index != -1:

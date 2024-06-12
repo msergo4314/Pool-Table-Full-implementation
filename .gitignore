@@ -1,0 +1,11 @@
+*.so
+*.o
+*.exe
+*.db
+phylib.phylib
+phylib_wrap.c
+phylib.py
+/images/
+/__pycache__/
+phylib.db-journal
+A3Test*.py
