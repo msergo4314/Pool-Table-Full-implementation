@@ -36,6 +36,7 @@ This project is a physics-based simulation of a game of billiards/pool/snooker. 
 - **server.py**: Server-side logic.
 - **style.css**: Styling for the webpage.
 - **phylib.i**: SWIG interface file.
+- **physics.py**: Logic for the pool table functions and database
 - **Makefile**: Automates the file generation and compilation process.
 
 ## Running the Project
